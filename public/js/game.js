@@ -1,0 +1,413 @@
+// 게임 방 Alpine.js 컴포넌트
+function gameRoom() {
+  return {
+    // 연결 상태
+    socket: null,
+    connecting: true,
+    joined: false,
+    error: '',
+
+    // 플레이어 정보
+    playerId: '',
+    nickname: localStorage.getItem('nickname') || (typeof generateRandomNickname === 'function' ? generateRandomNickname() : ''),
+
+    // 방 정보
+    room: window.INITIAL_ROOM || {},
+    shareLink: window.location.href,
+    showCode: false,
+
+    // 게임 상태
+    myWord: { word: null, isLiar: false },
+    wordRevealed: false,
+    wordChecked: false,
+    checkedCount: 0,
+
+    // 한줄 설명
+    descriptions: {},
+    descriptionOrder: [],
+    currentDescriberIndex: 0,
+    descriptionInput: '',
+    myDescriptionSubmitted: false,
+
+    // 토론
+    chatMessages: [],
+    chatInput: '',
+    myNomination: null,
+    nominations: {},
+
+    // 최후 변론
+    defenderId: null,
+
+    // 최종 투표
+    myFinalVote: null,
+    finalVoteCount: 0,
+
+    // 라이어 정답
+    liarId: null,
+    liarGuessInput: '',
+
+    // 결과
+    gameResult: null,
+
+    // 타이머
+    timer: 0,
+    timerInterval: null,
+    timerEndTime: 0,
+
+    // 계산된 속성
+    get isHost() {
+      return this.room.hostId === this.playerId;
+    },
+
+    get currentDescriber() {
+      if (!this.descriptionOrder.length) return null;
+      const id = this.descriptionOrder[this.currentDescriberIndex];
+      return this.room.players?.find(p => p.id === id) || null;
+    },
+
+    // 초기화
+    init() {
+      // URL에서 닉네임 파라미터 확인
+      const urlParams = new URLSearchParams(window.location.search);
+      const nicknameParam = urlParams.get('nickname');
+      if (nicknameParam) {
+        this.nickname = nicknameParam;
+        localStorage.setItem('nickname', nicknameParam);
+      }
+
+      // 소켓 연결
+      this.socket = io();
+
+      this.socket.on('connect', () => {
+        this.playerId = this.socket.id;
+        this.connecting = false;
+
+        // 닉네임이 있으면 자동 참가
+        if (this.nickname && this.nickname.length >= 2) {
+          this.joinRoom();
+        }
+      });
+
+      this.socket.on('disconnect', () => {
+        this.connecting = true;
+      });
+
+      // 방 참가 완료
+      this.socket.on('room-joined', (data) => {
+        this.room = data.room;
+        this.playerId = data.playerId;
+        this.joined = true;
+        this.error = '';
+
+        // URL 정리
+        window.history.replaceState({}, '', '/room/' + this.room.code);
+      });
+
+      // 플레이어 참가
+      this.socket.on('player-joined', (data) => {
+        if (!this.room.players.find(p => p.id === data.player.id)) {
+          this.room.players.push(data.player);
+        }
+        showToast(`${data.player.nickname}님이 참가했습니다.`);
+      });
+
+      // 플레이어 나감
+      this.socket.on('player-left', (data) => {
+        this.room.players = this.room.players.filter(p => p.id !== data.playerId);
+        if (data.newHostId) {
+          this.room.hostId = data.newHostId;
+        }
+      });
+
+      // 게임 시작
+      this.socket.on('game-started', (data) => {
+        this.myWord = { word: data.word, isLiar: data.isLiar };
+        this.room.state = 'word-check';
+        this.room.gameMode = data.gameMode;
+        this.wordRevealed = false;
+        this.wordChecked = false;
+        this.checkedCount = 0;
+        this.descriptions = {};
+        this.chatMessages = [];
+        this.myNomination = null;
+        this.nominations = {};
+        this.myFinalVote = null;
+        this.gameResult = null;
+      });
+
+      // 상태 업데이트
+      this.socket.on('room-state-update', (data) => {
+        this.room.state = data.state;
+        this.room.players = data.players;
+        this.checkedCount = data.players.filter(p => p.hasCheckedWord).length;
+      });
+
+      // 한줄 설명 시작
+      this.socket.on('description-phase-start', (data) => {
+        this.room.state = 'description';  // 상태 변경을 여기서 처리
+        this.descriptionOrder = data.order;
+        this.currentDescriberIndex = 0;
+        this.myDescriptionSubmitted = false;
+        this.checkedCount = this.room.players.length;  // 전원 확인 완료 상태
+        this.startTimer(data.endTime);
+      });
+
+      // 설명 차례
+      this.socket.on('description-turn', (data) => {
+        const idx = this.descriptionOrder.findIndex(id => id === data.currentDescriberId);
+        this.currentDescriberIndex = idx >= 0 ? idx : this.currentDescriberIndex + 1;
+        this.startTimer(data.endTime);
+      });
+
+      // 설명 제출됨
+      this.socket.on('description-submitted', (data) => {
+        this.descriptions[data.playerId] = data.description;
+        if (data.playerId === this.playerId) {
+          this.myDescriptionSubmitted = true;
+        }
+      });
+
+      // 토론 시작
+      this.socket.on('discussion-start', (data) => {
+        this.room.state = 'discussion';
+        this.descriptions = data.descriptions;
+        this.startTimer(data.endTime);
+      });
+
+      // 채팅 메시지
+      this.socket.on('chat-message', (data) => {
+        this.chatMessages.push(data);
+        this.$nextTick(() => {
+          const container = this.$refs.chatContainer;
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+        });
+      });
+
+      // 지목 현황
+      this.socket.on('nomination-update', (data) => {
+        this.nominations = data.nominations;
+      });
+
+      // 전원 지목 완료
+      this.socket.on('all-nominated', (data) => {
+        this.startTimer(data.endTime);
+      });
+
+      // 동점 감지
+      this.socket.on('tie-detected', (data) => {
+        showToast('동점입니다! 다시 토론합니다.');
+        this.room.state = 'discussion';
+        this.myNomination = null;
+        this.nominations = {};
+        this.startTimer(data.endTime);
+      });
+
+      // 최후 변론 시작
+      this.socket.on('defense-start', (data) => {
+        this.room.state = 'defense';
+        this.defenderId = data.defenderId;
+        this.startTimer(data.endTime);
+      });
+
+      // 최종 투표 시작
+      this.socket.on('final-vote-start', (data) => {
+        this.room.state = 'final-vote';
+        this.defenderId = data.defenderId;
+        this.myFinalVote = null;
+        this.finalVoteCount = 0;
+        this.stopTimer();
+      });
+
+      // 최종 투표 현황
+      this.socket.on('final-vote-update', (data) => {
+        this.finalVoteCount = data.votedCount;
+      });
+
+      // 최종 투표 결과
+      this.socket.on('final-vote-result', (data) => {
+        // 결과는 game-end 또는 liar-guess-phase에서 처리
+      });
+
+      // 라이어 정답 맞추기
+      this.socket.on('liar-guess-phase', (data) => {
+        this.room.state = 'liar-guess';
+        this.liarId = data.liarId;
+      });
+
+      // 게임 종료
+      this.socket.on('game-end', (data) => {
+        this.room.state = 'result';
+        this.gameResult = data;
+        this.stopTimer();
+      });
+
+      // 게임 리셋
+      this.socket.on('game-reset', (data) => {
+        this.room = data.room;
+        this.resetGameState();
+      });
+
+      // 에러
+      this.socket.on('error', (data) => {
+        this.error = data.message;
+        showToast(data.message, 'error');
+      });
+    },
+
+    // 방 참가
+    joinRoom() {
+      if (this.nickname.length < 2 || this.nickname.length > 10) {
+        this.error = '닉네임은 2-10자 사이여야 합니다.';
+        return;
+      }
+
+      localStorage.setItem('nickname', this.nickname);
+      this.socket.emit('join-room', {
+        roomCode: window.ROOM_CODE,
+        nickname: this.nickname
+      });
+    },
+
+    // 방 나가기
+    leaveRoom() {
+      this.socket.emit('leave-room');
+      window.location.href = '/';
+    },
+
+    // 게임 시작
+    startGame() {
+      this.socket.emit('start-game');
+    },
+
+    // 단어 확인
+    confirmWord() {
+      this.wordChecked = true;
+      this.socket.emit('word-checked');
+    },
+
+    // 설명 제출
+    submitDescription() {
+      const desc = this.descriptionInput.trim() || '...';
+      this.socket.emit('submit-description', { description: desc });
+      this.descriptionInput = '';
+    },
+
+    // 채팅 전송
+    sendChat() {
+      const message = this.chatInput.trim();
+      if (!message) return;
+      this.socket.emit('chat-message', { message });
+      this.chatInput = '';
+    },
+
+    // 지목
+    nominate(targetId) {
+      this.myNomination = targetId;
+      this.socket.emit('nominate', { targetId });
+    },
+
+    // 최종 투표
+    finalVote(agree) {
+      this.myFinalVote = agree;
+      this.socket.emit('final-vote', { agree });
+    },
+
+    // 라이어 정답 제출
+    submitLiarGuess() {
+      const word = this.liarGuessInput.trim();
+      if (!word) return;
+      this.socket.emit('liar-guess', { word });
+    },
+
+    // 게임 재시작
+    restartGame() {
+      this.socket.emit('restart-game');
+    },
+
+    // 게임 상태 초기화
+    resetGameState() {
+      this.myWord = { word: null, isLiar: false };
+      this.wordRevealed = false;
+      this.wordChecked = false;
+      this.descriptions = {};
+      this.chatMessages = [];
+      this.myNomination = null;
+      this.nominations = {};
+      this.myFinalVote = null;
+      this.gameResult = null;
+      this.myDescriptionSubmitted = false;
+      this.stopTimer();
+    },
+
+    // 타이머 시작
+    startTimer(endTime) {
+      this.stopTimer();
+      this.timerEndTime = endTime;
+
+      const updateTimer = () => {
+        const remaining = Math.ceil((this.timerEndTime - Date.now()) / 1000);
+        this.timer = Math.max(0, remaining);
+
+        if (this.timer <= 0) {
+          this.stopTimer();
+          this.onTimerEnd();
+        }
+      };
+
+      updateTimer();
+      this.timerInterval = setInterval(updateTimer, 1000);
+    },
+
+    // 타이머 정지
+    stopTimer() {
+      if (this.timerInterval) {
+        clearInterval(this.timerInterval);
+        this.timerInterval = null;
+      }
+    },
+
+    // 타이머 종료 시
+    onTimerEnd() {
+      if (this.room.state === 'description' && this.currentDescriber?.id === this.playerId && !this.myDescriptionSubmitted) {
+        // 시간 초과 시 빈 설명 제출
+        this.socket.emit('submit-description', { description: '...' });
+      } else if (this.room.state === 'discussion' && this.isHost) {
+        // 호스트가 토론 종료 알림
+        this.socket.emit('discussion-end');
+      } else if (this.room.state === 'defense' && this.isHost) {
+        // 호스트가 변론 종료 알림
+        this.socket.emit('defense-end');
+      }
+    },
+
+    // 시간 포맷
+    formatTime(seconds) {
+      return formatTime(seconds);
+    },
+
+    // 플레이어 닉네임 가져오기
+    getPlayerNickname(playerId) {
+      const player = this.room.players?.find(p => p.id === playerId);
+      return player?.nickname || '알 수 없음';
+    },
+
+    // 지목 받은 수
+    getNominationCount(playerId) {
+      return Object.values(this.nominations).filter(id => id === playerId).length;
+    },
+
+    // 코드 복사
+    copyCode() {
+      copyToClipboard(this.room.code);
+      showToast('방 코드가 복사되었습니다!', 'success');
+    },
+
+    // 링크 복사
+    copyLink() {
+      copyToClipboard(this.shareLink);
+      showToast('초대 링크가 복사되었습니다!', 'success');
+    }
+  };
+}

@@ -1,0 +1,419 @@
+<%- include('layout', { body: `
+<div x-data="gameRoom()" x-init="init()" class="min-h-screen flex flex-col">
+  <!-- 상단 바 -->
+  <header class="bg-gray-800 border-b border-gray-700 px-4 py-3">
+    <div class="container mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-4">
+        <h1 class="text-xl font-bold" x-text="room.name || '로딩 중...'"></h1>
+        <span class="text-sm text-gray-400 flex items-center gap-2">
+          코드:
+          <span class="font-mono text-primary" x-text="showCode ? (room.code || '${roomCode}') : '******'"></span>
+          <button
+            @click="showCode = !showCode"
+            class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs"
+            x-text="showCode ? '숨기기' : '보기'"
+          ></button>
+          <button
+            @click="copyCode()"
+            class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs"
+          >복사</button>
+        </span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-sm">
+          👥 <span x-text="room.players?.length || 0"></span>/<span x-text="room.maxPlayers || 8"></span>
+        </span>
+        <button @click="leaveRoom()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm">
+          나가기
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 닉네임 입력 모달 (방에 참가하지 않은 경우) -->
+  <div x-show="!joined && !connecting" x-cloak class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4">
+      <h2 class="text-2xl font-bold mb-6 text-center">방에 참가하기</h2>
+      <form @submit.prevent="joinRoom()">
+        <input
+          type="text"
+          x-model="nickname"
+          placeholder="닉네임 (2-10자)"
+          minlength="2"
+          maxlength="10"
+          required
+          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg mb-4 focus:ring-2 focus:ring-primary outline-none"
+        >
+        <div x-show="error" x-text="error" class="text-red-400 text-sm mb-4 text-center"></div>
+        <button type="submit" class="w-full py-3 bg-primary hover:bg-primary/80 rounded-lg font-bold">
+          참가하기
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 연결 중 -->
+  <div x-show="connecting" x-cloak class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div class="text-center">
+      <div class="animate-spin text-4xl mb-4">⏳</div>
+      <p>연결 중...</p>
+    </div>
+  </div>
+
+  <!-- 메인 컨텐츠 -->
+  <main class="flex-1 container mx-auto p-4 max-w-4xl" x-show="joined">
+
+    <!-- 대기실 -->
+    <div x-show="room.state === 'waiting'" class="space-y-6">
+      <!-- 방 정보 -->
+      <div class="bg-gray-800 rounded-xl p-6">
+        <div class="flex flex-wrap gap-4 text-sm text-gray-400">
+          <span>🎯 모드: <span class="text-white" x-text="room.gameMode === 'normal' ? '일반' : '바보'"></span></span>
+          <span>📁 카테고리: <span class="text-white" x-text="room.category"></span></span>
+          <span>⏱️ 설명: <span class="text-white" x-text="room.descriptionTime + '초'"></span></span>
+          <span>💬 토론: <span class="text-white" x-text="Math.floor(room.discussionTime / 60) + '분'"></span></span>
+          <span>🎤 변론: <span class="text-white" x-text="room.defenseTime + '초'"></span></span>
+        </div>
+      </div>
+
+      <!-- 공유 링크 -->
+      <div class="bg-gray-800 rounded-xl p-6">
+        <h3 class="font-semibold mb-3">🔗 친구 초대</h3>
+        <div class="flex gap-2">
+          <input
+            type="text"
+            readonly
+            :value="shareLink"
+            class="flex-1 px-4 py-2 bg-gray-700 rounded-lg text-sm"
+          >
+          <button @click="copyLink()" class="px-4 py-2 bg-primary hover:bg-primary/80 rounded-lg">
+            복사
+          </button>
+        </div>
+      </div>
+
+      <!-- 플레이어 목록 -->
+      <div class="bg-gray-800 rounded-xl p-6">
+        <h3 class="font-semibold mb-4">👥 플레이어</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <template x-for="player in room.players" :key="player.id">
+            <div
+              class="p-4 rounded-lg text-center"
+              :class="player.isConnected ? 'bg-gray-700' : 'bg-gray-700/50 opacity-50'"
+            >
+              <div class="text-2xl mb-1" x-text="player.isHost ? '👑' : '😊'"></div>
+              <div class="font-medium truncate" x-text="player.nickname"></div>
+              <div x-show="player.id === playerId" class="text-xs text-primary">(나)</div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 게임 시작 버튼 (호스트만) -->
+      <div x-show="isHost" class="text-center">
+        <button
+          @click="startGame()"
+          :disabled="room.players?.length < 3"
+          class="px-8 py-4 bg-gradient-to-r from-primary to-secondary rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span x-show="room.players?.length >= 3">🎮 게임 시작</span>
+          <span x-show="room.players?.length < 3">최소 3명이 필요합니다</span>
+        </button>
+      </div>
+      <div x-show="!isHost" class="text-center text-gray-400">
+        호스트가 게임을 시작할 때까지 기다려주세요...
+      </div>
+    </div>
+
+    <!-- 단어 확인 -->
+    <div x-show="room.state === 'word-check'" class="text-center py-12">
+      <h2 class="text-2xl font-bold mb-8">🔍 당신의 제시어</h2>
+
+      <div
+        x-show="!wordRevealed"
+        @click="wordRevealed = true"
+        class="inline-block px-12 py-8 bg-gray-800 rounded-2xl cursor-pointer hover:bg-gray-750 transition-colors border-2 border-dashed border-gray-600"
+      >
+        <p class="text-gray-400">탭하여 확인</p>
+      </div>
+
+      <div x-show="wordRevealed" class="space-y-6 fade-in">
+        <div class="inline-block px-12 py-8 bg-gradient-to-br from-primary to-secondary rounded-2xl">
+          <p x-show="!myWord.isLiar" class="text-4xl font-bold" x-text="myWord.word"></p>
+          <p x-show="myWord.isLiar" class="text-3xl font-bold">🎭 당신은 라이어입니다!</p>
+        </div>
+
+        <button
+          @click="confirmWord()"
+          :disabled="wordChecked"
+          class="block mx-auto px-8 py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold disabled:opacity-50"
+        >
+          <span x-show="!wordChecked">확인 완료</span>
+          <span x-show="wordChecked">대기 중... (<span x-text="checkedCount"></span>/<span x-text="room.players?.length"></span>)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 한줄 설명 -->
+    <div x-show="room.state === 'description'" class="space-y-6">
+      <div class="text-center">
+        <h2 class="text-2xl font-bold mb-2">📝 한줄 설명</h2>
+        <p class="text-gray-400">제시어를 직접 말하지 않고 설명하세요!</p>
+      </div>
+
+      <!-- 타이머 -->
+      <div class="text-center">
+        <div class="inline-flex items-center gap-2 px-6 py-3 bg-gray-800 rounded-full">
+          <span>⏱️</span>
+          <span class="text-2xl font-mono font-bold" x-text="formatTime(timer)"></span>
+        </div>
+      </div>
+
+      <!-- 현재 차례 -->
+      <div class="bg-gray-800 rounded-xl p-6 text-center">
+        <template x-if="currentDescriber">
+          <div>
+            <p class="text-gray-400 mb-2">현재 차례</p>
+            <p class="text-2xl font-bold" x-text="currentDescriber.nickname"></p>
+            <p x-show="currentDescriber.id === playerId" class="text-primary mt-2">(당신의 차례입니다!)</p>
+          </div>
+        </template>
+      </div>
+
+      <!-- 입력 (내 차례일 때) -->
+      <div x-show="currentDescriber?.id === playerId && !myDescriptionSubmitted" class="bg-gray-800 rounded-xl p-6">
+        <form @submit.prevent="submitDescription()">
+          <input
+            type="text"
+            x-model="descriptionInput"
+            placeholder="제시어에 대한 한줄 설명을 입력하세요"
+            maxlength="100"
+            class="w-full px-4 py-3 bg-gray-700 rounded-lg mb-4 focus:ring-2 focus:ring-primary outline-none"
+          >
+          <button type="submit" class="w-full py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold">
+            제출
+          </button>
+        </form>
+      </div>
+
+      <!-- 제출된 설명들 -->
+      <div class="bg-gray-800 rounded-xl p-6">
+        <h3 class="font-semibold mb-4">제출된 설명</h3>
+        <div class="space-y-3">
+          <template x-for="(desc, pid) in descriptions" :key="pid">
+            <div class="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
+              <span class="font-medium" x-text="getPlayerNickname(pid) + ':'"></span>
+              <span class="text-gray-300" x-text="desc"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 토론 + 지목 -->
+    <div x-show="room.state === 'discussion'" class="space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold">💬 토론</h2>
+        <div class="px-4 py-2 bg-gray-800 rounded-full">
+          ⏱️ <span class="font-mono" x-text="formatTime(timer)"></span>
+        </div>
+      </div>
+
+      <!-- 설명 목록 -->
+      <div class="bg-gray-800 rounded-xl p-4">
+        <h3 class="text-sm text-gray-400 mb-3">📝 한줄 설명 목록</h3>
+        <div class="grid gap-2">
+          <template x-for="player in room.players" :key="player.id">
+            <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+              <div>
+                <span class="font-medium" x-text="player.nickname"></span>:
+                <span class="text-gray-300" x-text="descriptions[player.id] || '...'"></span>
+              </div>
+              <button
+                x-show="player.id !== playerId"
+                @click="nominate(player.id)"
+                class="px-3 py-1 rounded-lg text-sm transition-colors"
+                :class="myNomination === player.id ? 'bg-danger' : 'bg-gray-600 hover:bg-gray-500'"
+              >
+                <span x-show="myNomination === player.id">👆 지목함</span>
+                <span x-show="myNomination !== player.id">지목</span>
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 지목 현황 -->
+      <div class="bg-gray-800 rounded-xl p-4">
+        <h3 class="text-sm text-gray-400 mb-3">👆 지목 현황</h3>
+        <div class="flex flex-wrap gap-2">
+          <template x-for="player in room.players" :key="player.id">
+            <div class="px-3 py-2 bg-gray-700 rounded-lg text-sm">
+              <span x-text="player.nickname"></span>:
+              <span x-text="getNominationCount(player.id)"></span>표
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- 채팅 -->
+      <div class="bg-gray-800 rounded-xl p-4 flex flex-col h-64">
+        <div class="flex-1 overflow-y-auto space-y-2 mb-4" x-ref="chatContainer">
+          <template x-for="msg in chatMessages" :key="msg.timestamp">
+            <div class="text-sm">
+              <span class="font-medium text-primary" x-text="msg.nickname + ':'"></span>
+              <span x-text="msg.message"></span>
+            </div>
+          </template>
+        </div>
+        <form @submit.prevent="sendChat()" class="flex gap-2">
+          <input
+            type="text"
+            x-model="chatInput"
+            placeholder="메시지를 입력하세요"
+            maxlength="200"
+            class="flex-1 px-4 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+          >
+          <button type="submit" class="px-4 py-2 bg-primary rounded-lg">전송</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 최후 변론 -->
+    <div x-show="room.state === 'defense'" class="space-y-6 text-center">
+      <h2 class="text-2xl font-bold">🎤 최후 변론</h2>
+
+      <div class="px-6 py-3 bg-gray-800 rounded-full inline-block">
+        ⏱️ <span class="font-mono text-2xl" x-text="formatTime(timer)"></span>
+      </div>
+
+      <div class="bg-gray-800 rounded-xl p-8">
+        <p class="text-gray-400 mb-2">변론자</p>
+        <p class="text-3xl font-bold" x-text="getPlayerNickname(defenderId)"></p>
+        <p x-show="defenderId === playerId" class="text-primary mt-4">당신의 변론 시간입니다!</p>
+      </div>
+
+      <!-- 변론자만 채팅 가능 -->
+      <div x-show="defenderId === playerId" class="bg-gray-800 rounded-xl p-4">
+        <form @submit.prevent="sendChat()" class="flex gap-2">
+          <input
+            type="text"
+            x-model="chatInput"
+            placeholder="변론 메시지를 입력하세요"
+            maxlength="200"
+            class="flex-1 px-4 py-2 bg-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+          >
+          <button type="submit" class="px-4 py-2 bg-primary rounded-lg">전송</button>
+        </form>
+      </div>
+
+      <!-- 채팅 표시 (읽기 전용) -->
+      <div class="bg-gray-800 rounded-xl p-4 text-left h-48 overflow-y-auto" x-ref="chatContainer">
+        <template x-for="msg in chatMessages" :key="msg.timestamp">
+          <div class="text-sm mb-2">
+            <span class="font-medium text-primary" x-text="msg.nickname + ':'"></span>
+            <span x-text="msg.message"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- 최종 투표 -->
+    <div x-show="room.state === 'final-vote'" class="space-y-6 text-center">
+      <h2 class="text-2xl font-bold">🗳️ 최종 투표</h2>
+
+      <div class="bg-gray-800 rounded-xl p-8">
+        <p class="text-gray-400 mb-2">이 사람이 라이어입니까?</p>
+        <p class="text-3xl font-bold mb-6" x-text="getPlayerNickname(defenderId)"></p>
+
+        <div x-show="defenderId !== playerId && !myFinalVote" class="flex justify-center gap-4">
+          <button @click="finalVote(true)" class="px-8 py-4 bg-success hover:bg-success/80 rounded-xl font-bold text-xl">
+            ⭕ 찬성
+          </button>
+          <button @click="finalVote(false)" class="px-8 py-4 bg-danger hover:bg-danger/80 rounded-xl font-bold text-xl">
+            ❌ 반대
+          </button>
+        </div>
+
+        <div x-show="defenderId === playerId" class="text-gray-400">
+          당신은 투표할 수 없습니다.
+        </div>
+
+        <div x-show="myFinalVote" class="text-gray-400">
+          투표 완료! 결과를 기다리는 중...
+          (<span x-text="finalVoteCount"></span>/<span x-text="room.players?.length - 1"></span>)
+        </div>
+      </div>
+    </div>
+
+    <!-- 라이어 정답 맞추기 -->
+    <div x-show="room.state === 'liar-guess'" class="space-y-6 text-center">
+      <h2 class="text-2xl font-bold">🎯 정답 맞추기</h2>
+
+      <div x-show="playerId === liarId" class="bg-gray-800 rounded-xl p-8">
+        <p class="text-gray-400 mb-4">시민들의 제시어를 맞춰보세요!</p>
+        <form @submit.prevent="submitLiarGuess()">
+          <input
+            type="text"
+            x-model="liarGuessInput"
+            placeholder="제시어를 입력하세요"
+            class="w-full px-4 py-3 bg-gray-700 rounded-lg mb-4 text-center text-xl focus:ring-2 focus:ring-primary outline-none"
+          >
+          <button type="submit" class="px-8 py-3 bg-primary hover:bg-primary/80 rounded-lg font-bold">
+            제출
+          </button>
+        </form>
+      </div>
+
+      <div x-show="playerId !== liarId" class="bg-gray-800 rounded-xl p-8">
+        <p class="text-gray-400">라이어가 정답을 맞추는 중...</p>
+      </div>
+    </div>
+
+    <!-- 결과 -->
+    <div x-show="room.state === 'result'" class="space-y-6 text-center">
+      <h2 class="text-3xl font-bold mb-8" x-text="gameResult?.winner === 'citizen' ? '🎉 시민 승리!' : '🎭 라이어 승리!'"></h2>
+
+      <div class="bg-gray-800 rounded-xl p-8 space-y-4">
+        <div>
+          <p class="text-gray-400">라이어</p>
+          <p class="text-2xl font-bold text-danger" x-text="getPlayerNickname(gameResult?.liarId)"></p>
+        </div>
+
+        <div class="border-t border-gray-700 pt-4">
+          <p class="text-gray-400">시민 제시어</p>
+          <p class="text-2xl font-bold text-primary" x-text="gameResult?.citizenWord"></p>
+        </div>
+
+        <div x-show="gameResult?.liarWord" class="border-t border-gray-700 pt-4">
+          <p class="text-gray-400">라이어 제시어</p>
+          <p class="text-2xl font-bold text-secondary" x-text="gameResult?.liarWord"></p>
+        </div>
+
+        <div x-show="gameResult?.wasLiarCaught" class="border-t border-gray-700 pt-4">
+          <p class="text-gray-400">라이어가 추측한 답</p>
+          <p class="text-xl" x-text="gameResult?.liarGuess || '(제출 안 함)'"></p>
+          <p x-show="gameResult?.liarGuessedCorrectly" class="text-success">✓ 정답! 역전 승리!</p>
+          <p x-show="!gameResult?.liarGuessedCorrectly && gameResult?.liarGuess" class="text-danger">✗ 오답</p>
+        </div>
+      </div>
+
+      <div x-show="isHost">
+        <button @click="restartGame()" class="px-8 py-4 bg-gradient-to-r from-primary to-secondary rounded-xl font-bold text-lg">
+          🔄 다시 하기
+        </button>
+      </div>
+      <div x-show="!isHost" class="text-gray-400">
+        호스트가 게임을 재시작할 때까지 기다려주세요...
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="/js/game.js"></script>
+<script>
+  window.ROOM_CODE = '${roomCode}';
+  window.INITIAL_ROOM = ${JSON.stringify(room)};
+</script>
+` }) %>

@@ -1,0 +1,125 @@
+<%- include('layout', { body: `
+<div class="container mx-auto px-4 py-8 max-w-lg">
+  <a href="/" class="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
+    ← 로비로 돌아가기
+  </a>
+
+  <div class="bg-gray-800 rounded-2xl p-8 shadow-xl">
+    <h1 class="text-3xl font-bold text-center mb-8">🚪 방 참가하기</h1>
+
+    <form x-data="joinRoomForm()" @submit.prevent="submit()" class="space-y-6">
+      <!-- 닉네임 -->
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-2">닉네임</label>
+        <input
+          type="text"
+          x-model="nickname"
+          placeholder="닉네임을 입력하세요"
+          minlength="2"
+          maxlength="10"
+          required
+          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+        >
+      </div>
+
+      <!-- 방 코드 -->
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-2">방 코드</label>
+        <input
+          type="text"
+          x-model="roomCode"
+          placeholder="6자리 방 코드"
+          maxlength="6"
+          required
+          @input="roomCode = roomCode.toUpperCase()"
+          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-center text-2xl tracking-widest font-mono"
+        >
+      </div>
+
+      <!-- 방 상태 확인 -->
+      <div x-show="roomStatus" class="text-center py-2">
+        <span x-show="roomStatus === 'checking'" class="text-gray-400">확인 중...</span>
+        <span x-show="roomStatus === 'available'" class="text-green-400">✓ 참가 가능</span>
+        <span x-show="roomStatus === 'not-found'" class="text-red-400">✗ 방을 찾을 수 없습니다</span>
+        <span x-show="roomStatus === 'full'" class="text-yellow-400">⚠ 방이 가득 찼거나 게임 중입니다</span>
+      </div>
+
+      <!-- 에러 메시지 -->
+      <div x-show="error" x-text="error" class="text-red-400 text-sm text-center"></div>
+
+      <!-- 제출 버튼 -->
+      <button
+        type="submit"
+        :disabled="loading || roomCode.length !== 6"
+        class="w-full py-4 bg-gradient-to-r from-primary to-secondary rounded-lg font-bold text-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+      >
+        <span x-show="!loading">참가하기</span>
+        <span x-show="loading">참가 중...</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+function joinRoomForm() {
+  return {
+    nickname: localStorage.getItem('nickname') || generateRandomNickname(),
+    roomCode: '${code}'.toUpperCase(),
+    loading: false,
+    error: '',
+    roomStatus: '',
+    checkTimeout: null,
+
+    init() {
+      this.$watch('roomCode', (value) => {
+        if (this.checkTimeout) clearTimeout(this.checkTimeout);
+        if (value.length === 6) {
+          this.checkTimeout = setTimeout(() => this.checkRoom(), 300);
+        } else {
+          this.roomStatus = '';
+        }
+      });
+
+      if (this.roomCode.length === 6) {
+        this.checkRoom();
+      }
+    },
+
+    async checkRoom() {
+      this.roomStatus = 'checking';
+      try {
+        const res = await fetch('/api/rooms/' + this.roomCode);
+        if (res.ok) {
+          const data = await res.json();
+          this.roomStatus = data.canJoin ? 'available' : 'full';
+        } else {
+          this.roomStatus = 'not-found';
+        }
+      } catch (e) {
+        this.roomStatus = '';
+      }
+    },
+
+    submit() {
+      if (this.nickname.length < 2 || this.nickname.length > 10) {
+        this.error = '닉네임은 2-10자 사이여야 합니다.';
+        return;
+      }
+      if (this.roomCode.length !== 6) {
+        this.error = '올바른 방 코드를 입력하세요.';
+        return;
+      }
+
+      this.loading = true;
+      this.error = '';
+
+      // 닉네임 저장
+      localStorage.setItem('nickname', this.nickname);
+
+      // 방 참가
+      window.location.href = '/room/' + this.roomCode + '?nickname=' + encodeURIComponent(this.nickname);
+    }
+  }
+}
+</script>
+` }) %>

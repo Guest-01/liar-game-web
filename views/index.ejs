@@ -1,0 +1,96 @@
+<%- include('layout', { body: `
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+  <!-- 헤더 -->
+  <header class="text-center mb-12">
+    <h1 class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4">
+      🎭 라이어 게임
+    </h1>
+    <p class="text-gray-400 text-lg">누가 라이어인지 찾아내세요!</p>
+  </header>
+
+  <!-- 메인 액션 -->
+  <div class="grid md:grid-cols-2 gap-6 mb-12">
+    <a href="/create" class="block p-8 bg-gradient-to-br from-primary to-secondary rounded-2xl hover:scale-105 transition-transform shadow-lg">
+      <div class="text-center">
+        <span class="text-4xl mb-4 block">🎮</span>
+        <h2 class="text-2xl font-bold mb-2">방 만들기</h2>
+        <p class="text-white/80">새로운 게임을 시작하세요</p>
+      </div>
+    </a>
+
+    <a href="/join" class="block p-8 bg-gray-800 border-2 border-gray-700 rounded-2xl hover:border-primary hover:scale-105 transition-all">
+      <div class="text-center">
+        <span class="text-4xl mb-4 block">🚪</span>
+        <h2 class="text-2xl font-bold mb-2">방 참가하기</h2>
+        <p class="text-gray-400">코드로 방에 참가하세요</p>
+      </div>
+    </a>
+  </div>
+
+  <!-- 공개 방 목록 -->
+  <section x-data="lobbyData()" x-init="init()">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold">🏠 공개 방 목록</h2>
+      <button @click="refresh()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-2">
+        <span x-show="!loading">🔄</span>
+        <span x-show="loading" class="animate-spin">⏳</span>
+        새로고침
+      </button>
+    </div>
+
+    <div x-show="rooms.length === 0" class="text-center py-12 text-gray-500">
+      <span class="text-4xl block mb-4">😴</span>
+      <p>현재 참가 가능한 공개 방이 없습니다.</p>
+      <p class="text-sm mt-2">직접 방을 만들어보세요!</p>
+    </div>
+
+    <div class="grid gap-4">
+      <template x-for="room in rooms" :key="room.code">
+        <div class="bg-gray-800 rounded-xl p-6 hover:bg-gray-750 transition-colors border border-gray-700">
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-xl font-semibold" x-text="room.name"></h3>
+              <div class="flex gap-4 mt-2 text-sm text-gray-400">
+                <span>
+                  👥 <span x-text="room.playerCount"></span>/<span x-text="room.maxPlayers"></span>
+                </span>
+                <span x-text="room.gameMode === 'normal' ? '🎯 일반' : '🤡 바보'"></span>
+                <span>📁 <span x-text="room.category"></span></span>
+              </div>
+            </div>
+            <a :href="'/room/' + room.code" class="px-6 py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold transition-colors">
+              참가
+            </a>
+          </div>
+        </div>
+      </template>
+    </div>
+  </section>
+</div>
+
+<script>
+function lobbyData() {
+  return {
+    rooms: ${JSON.stringify(publicRooms)},
+    loading: false,
+
+    init() {
+      // 주기적으로 새로고침
+      setInterval(() => this.refresh(), 10000);
+    },
+
+    async refresh() {
+      this.loading = true;
+      try {
+        const res = await fetch('/api/rooms');
+        const data = await res.json();
+        this.rooms = data.rooms;
+      } catch (e) {
+        console.error('Failed to fetch rooms:', e);
+      }
+      this.loading = false;
+    }
+  }
+}
+</script>
+` }) %>

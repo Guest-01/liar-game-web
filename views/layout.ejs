@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %>라이어 게임</title>
+  <meta name="description" content="온라인 멀티플레이어 라이어 게임 (Word Wolf)">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#6366f1',
+            secondary: '#8b5cf6',
+            accent: '#f59e0b',
+            danger: '#ef4444',
+            success: '#22c55e'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+
+    .fade-in {
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .pulse-border {
+      animation: pulseBorder 2s ease-in-out infinite;
+    }
+
+    @keyframes pulseBorder {
+      0%, 100% { border-color: #6366f1; }
+      50% { border-color: #8b5cf6; }
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+  <%- body %>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/nickname.js"></script>
+</body>
+</html>
