@@ -37,7 +37,7 @@ export function setupSocketHandlers(io: Server): void {
       }
 
       const room = roomManager.createRoom(socket.id, nickname, roomName, {
-        isPublic,
+        isPublic: isPublic === true,
         maxPlayers: Math.min(8, Math.max(3, maxPlayers)),
         gameMode,
         descriptionTime: Math.min(60, Math.max(10, descriptionTime)),
@@ -323,10 +323,12 @@ export function setupSocketHandlers(io: Server): void {
             io.to(room.code).emit('game-end', gameResult);
           }
         } else {
-          // 과반수 미달 - 라이어 승리
-          room.goToResult();
-          const gameResult = room.getGameResult();
-          io.to(room.code).emit('game-end', gameResult);
+          // 과반수 미달 - 토론 단계로 복귀
+          room.restartDiscussion();
+          io.to(room.code).emit('restart-discussion', {
+            reason: 'vote-failed',
+            discussionEndTime: room.game.discussionEndTime
+          });
         }
       }
     });

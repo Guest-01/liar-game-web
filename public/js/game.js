@@ -75,6 +75,19 @@ function gameRoom() {
         localStorage.setItem('nickname', nicknameParam);
       }
 
+      // 상태 변경 시 Lucide 아이콘 초기화
+      this.$watch('room.state', () => {
+        this.$nextTick(() => {
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+      });
+
+      this.$watch('room.players', () => {
+        this.$nextTick(() => {
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+      });
+
       // 소켓 연결
       this.socket = io();
 
@@ -178,10 +191,13 @@ function gameRoom() {
       this.socket.on('chat-message', (data) => {
         this.chatMessages.push(data);
         this.$nextTick(() => {
-          const container = this.$refs.chatContainer;
-          if (container) {
-            container.scrollTop = container.scrollHeight;
-          }
+          // 모바일 채팅과 사이드바 채팅 모두 스크롤
+          const containers = [this.$refs.chatContainer, this.$refs.sidebarChatContainer];
+          containers.forEach(container => {
+            if (container) {
+              container.scrollTop = container.scrollHeight;
+            }
+          });
         });
       });
 
@@ -227,7 +243,18 @@ function gameRoom() {
 
       // 최종 투표 결과
       this.socket.on('final-vote-result', (data) => {
-        // 결과는 game-end 또는 liar-guess-phase에서 처리
+        // 결과는 game-end, liar-guess-phase, 또는 restart-discussion에서 처리
+      });
+
+      // 토론 재시작 (최종 투표 과반 미달)
+      this.socket.on('restart-discussion', (data) => {
+        this.room.state = 'discussion';
+        this.nominatedPlayerId = null;
+        this.myFinalVote = null;
+        this.finalVoteCount = 0;
+        this.discussionEndTime = data.discussionEndTime;
+        this.startTimer();
+        showToast('과반수 동의를 얻지 못해 토론을 재시작합니다.', 'info');
       });
 
       // 라이어 정답 맞추기
