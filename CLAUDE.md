@@ -21,7 +21,7 @@ npm start        # 프로덕션 서버 실행
 - **Template**: EJS
 - **Realtime**: Socket.IO
 - **Client State**: Alpine.js (CDN)
-- **Styling**: Tailwind CSS (CDN)
+- **Styling**: Tailwind CSS (CDN), Lucide Icons
 
 ### Directory Structure
 ```
@@ -48,6 +48,8 @@ public/js/
 
 ### Game State Machine
 `RoomState` 흐름: `waiting` → `word-check` → `description` → `discussion` → `defense` → `final-vote` → (`liar-guess`) → `result`
+
+- `final-vote`에서 과반 미달 시 `discussion`으로 복귀
 
 ### Key Patterns
 

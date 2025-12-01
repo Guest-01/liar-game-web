@@ -15,6 +15,7 @@
 4. **토론 시간**에 서로의 설명을 바탕으로 라이어를 추리합니다
 5. 가장 많은 지목을 받은 플레이어가 **최후 변론**을 합니다
 6. **최종 투표**로 그 플레이어가 라이어인지 판단합니다
+7. 최종 투표에서 과반 동의를 얻지 못하면 **토론 단계로 복귀**합니다
 
 ### 승리 조건
 - **시민 승리**: 라이어를 정확히 찾아내면 승리
@@ -38,7 +39,7 @@
 - **Template Engine**: EJS
 - **Realtime**: Socket.IO
 - **Frontend State**: Alpine.js
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS, Lucide Icons
 
 ## 설치 및 실행
 
@@ -109,8 +110,8 @@ public/js/
     ↓
 최후 변론 (defense)
     ↓
-최종 투표 (final-vote)
-    ↓
+최종 투표 (final-vote) ──[과반 미달]──→ 토론 + 지목으로 복귀
+    ↓ [과반 동의]
 [라이어가 잡힌 경우]
 라이어 정답 맞추기 (liar-guess)
     ↓
