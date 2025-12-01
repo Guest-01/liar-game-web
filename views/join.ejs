@@ -5,7 +5,7 @@
   </a>
 
   <div class="bg-gray-800 rounded-2xl p-8 shadow-xl">
-    <h1 class="text-3xl font-bold text-center mb-8">🚪 방 참가하기</h1>
+    <h1 class="text-3xl font-bold text-center mb-8 flex items-center justify-center gap-2"><i data-lucide="door-open" class="w-8 h-8"></i> 방 참가하기</h1>
 
     <form x-data="joinRoomForm()" @submit.prevent="submit()" class="space-y-6">
       <!-- 닉네임 -->
@@ -39,9 +39,9 @@
       <!-- 방 상태 확인 -->
       <div x-show="roomStatus" class="text-center py-2">
         <span x-show="roomStatus === 'checking'" class="text-gray-400">확인 중...</span>
-        <span x-show="roomStatus === 'available'" class="text-green-400">✓ 참가 가능</span>
-        <span x-show="roomStatus === 'not-found'" class="text-red-400">✗ 방을 찾을 수 없습니다</span>
-        <span x-show="roomStatus === 'full'" class="text-yellow-400">⚠ 방이 가득 찼거나 게임 중입니다</span>
+        <span x-show="roomStatus === 'available'" class="text-green-400 flex items-center justify-center gap-1"><i data-lucide="check" class="w-4 h-4"></i> 참가 가능</span>
+        <span x-show="roomStatus === 'not-found'" class="text-red-400 flex items-center justify-center gap-1"><i data-lucide="x" class="w-4 h-4"></i> 방을 찾을 수 없습니다</span>
+        <span x-show="roomStatus === 'full'" class="text-yellow-400 flex items-center justify-center gap-1"><i data-lucide="alert-triangle" class="w-4 h-4"></i> 방이 가득 찼거나 게임 중입니다</span>
       </div>
 
       <!-- 에러 메시지 -->

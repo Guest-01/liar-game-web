@@ -2,8 +2,8 @@
 <div class="container mx-auto px-4 py-8 max-w-4xl">
   <!-- 헤더 -->
   <header class="text-center mb-12">
-    <h1 class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4">
-      🎭 라이어 게임
+    <h1 class="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-4 flex items-center justify-center gap-3">
+      <i data-lucide="drama" class="w-12 h-12 text-primary"></i> 라이어 게임
     </h1>
     <p class="text-gray-400 text-lg">누가 라이어인지 찾아내세요!</p>
   </header>
@@ -12,7 +12,7 @@
   <div class="grid md:grid-cols-2 gap-6 mb-12">
     <a href="/create" class="block p-8 bg-gradient-to-br from-primary to-secondary rounded-2xl hover:scale-105 transition-transform shadow-lg">
       <div class="text-center">
-        <span class="text-4xl mb-4 block">🎮</span>
+        <i data-lucide="gamepad-2" class="w-10 h-10 mx-auto mb-4"></i>
         <h2 class="text-2xl font-bold mb-2">방 만들기</h2>
         <p class="text-white/80">새로운 게임을 시작하세요</p>
       </div>
@@ -20,7 +20,7 @@
 
     <a href="/join" class="block p-8 bg-gray-800 border-2 border-gray-700 rounded-2xl hover:border-primary hover:scale-105 transition-all">
       <div class="text-center">
-        <span class="text-4xl mb-4 block">🚪</span>
+        <i data-lucide="door-open" class="w-10 h-10 mx-auto mb-4"></i>
         <h2 class="text-2xl font-bold mb-2">방 참가하기</h2>
         <p class="text-gray-400">코드로 방에 참가하세요</p>
       </div>
@@ -30,16 +30,15 @@
   <!-- 공개 방 목록 -->
   <section x-data="lobbyData()" x-init="init()">
     <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold">🏠 공개 방 목록</h2>
+      <h2 class="text-2xl font-bold flex items-center gap-2"><i data-lucide="home" class="w-6 h-6"></i> 공개 방 목록</h2>
       <button @click="refresh()" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-2">
-        <span x-show="!loading">🔄</span>
-        <span x-show="loading" class="animate-spin">⏳</span>
+        <i data-lucide="refresh-cw" class="w-4 h-4" :class="loading && 'animate-spin'"></i>
         새로고침
       </button>
     </div>
 
     <div x-show="rooms.length === 0" class="text-center py-12 text-gray-500">
-      <span class="text-4xl block mb-4">😴</span>
+      <i data-lucide="moon" class="w-10 h-10 mx-auto mb-4"></i>
       <p>현재 참가 가능한 공개 방이 없습니다.</p>
       <p class="text-sm mt-2">직접 방을 만들어보세요!</p>
     </div>
@@ -51,11 +50,14 @@
             <div>
               <h3 class="text-xl font-semibold" x-text="room.name"></h3>
               <div class="flex gap-4 mt-2 text-sm text-gray-400">
-                <span>
-                  👥 <span x-text="room.playerCount"></span>/<span x-text="room.maxPlayers"></span>
+                <span class="flex items-center gap-1">
+                  <i data-lucide="users" class="w-4 h-4"></i> <span x-text="room.playerCount"></span>/<span x-text="room.maxPlayers"></span>
                 </span>
-                <span x-text="room.gameMode === 'normal' ? '🎯 일반' : '🤡 바보'"></span>
-                <span>📁 <span x-text="room.category"></span></span>
+                <span class="flex items-center gap-1">
+                  <i :data-lucide="room.gameMode === 'normal' ? 'target' : 'smile'" class="w-4 h-4"></i>
+                  <span x-text="room.gameMode === 'normal' ? '일반' : '바보'"></span>
+                </span>
+                <span class="flex items-center gap-1"><i data-lucide="folder" class="w-4 h-4"></i> <span x-text="room.category"></span></span>
               </div>
             </div>
             <a :href="'/room/' + room.code" class="px-6 py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold transition-colors">
@@ -85,6 +87,7 @@ function lobbyData() {
         const res = await fetch('/api/rooms');
         const data = await res.json();
         this.rooms = data.rooms;
+        this.$nextTick(() => lucide.createIcons());
       } catch (e) {
         console.error('Failed to fetch rooms:', e);
       }

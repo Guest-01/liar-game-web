@@ -96,18 +96,17 @@ export class RoomManager {
     room.removePlayer(playerId);
     this.playerToRoom.delete(playerId);
 
-    // 방에 아무도 없으면 30초 후 삭제 예약
+    // 방에 아무도 없으면 5초 후 삭제 (리다이렉트 대기)
     if (room.players.length === 0) {
       const timeout = setTimeout(() => {
-        // 아직 비어있으면 삭제
         if (room.players.length === 0) {
           this.rooms.delete(roomCode);
           this.pendingDeletions.delete(roomCode);
         }
-      }, 30000); // 30초 유예
+      }, 5000);
 
       this.pendingDeletions.set(roomCode, timeout);
-      return { room, deleted: false }; // 아직 삭제 안 됨
+      return { room, deleted: false };
     }
 
     return { room, deleted: false };
