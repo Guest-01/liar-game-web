@@ -36,6 +36,7 @@ export interface Game {
   finalVotes: Record<string, boolean>;
   discussionEndTime: number;
   defenseEndTime: number;
+  liarGuessEndTime: number;
   liarGuess: string | null;
 }
 

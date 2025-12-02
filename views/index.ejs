@@ -8,21 +8,70 @@
     <p class="text-gray-400 text-lg">누가 라이어인지 찾아내세요!</p>
   </header>
 
+  <!-- 닉네임 카드 -->
+  <div x-data="nicknameCard()" class="mb-6 bg-gray-800 rounded-xl p-4 border border-gray-700">
+    <div class="flex items-center gap-2">
+      <i data-lucide="user" class="w-5 h-5 text-primary"></i>
+      <span class="text-gray-400 text-sm">내 닉네임</span>
+    </div>
+
+    <div class="mt-3 flex items-center gap-2">
+      <!-- 편집 모드 -->
+      <template x-if="editing">
+        <input
+          type="text"
+          x-model="tempNickname"
+          @blur="saveNickname()"
+          @keydown.enter="saveNickname()"
+          @keydown.escape="cancelEdit()"
+          x-ref="nicknameInput"
+          maxlength="10"
+          class="flex-1 px-3 py-2 bg-gray-700 border border-primary rounded-lg focus:ring-2 focus:ring-primary outline-none text-lg font-semibold"
+        >
+      </template>
+
+      <!-- 표시 모드 -->
+      <template x-if="!editing">
+        <button
+          @click="startEdit()"
+          class="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-left text-lg font-semibold transition-colors"
+          title="클릭하여 수정"
+        >
+          <span x-text="nickname"></span>
+          <i data-lucide="pencil" class="w-4 h-4 inline ml-2 text-gray-500"></i>
+        </button>
+      </template>
+
+      <!-- 랜덤 생성 버튼 -->
+      <button
+        @click="randomize()"
+        class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+        title="랜덤 닉네임 생성"
+      >
+        <i data-lucide="shuffle" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- 유효성 검사 메시지 -->
+    <p x-show="error" x-text="error" class="mt-2 text-sm text-red-400"></p>
+    <p x-show="!error && editing" class="mt-2 text-sm text-gray-500">2-10자 사이로 입력하세요</p>
+  </div>
+
   <!-- 메인 액션 -->
-  <div class="grid md:grid-cols-2 gap-6 mb-12">
-    <a href="/create" class="block p-8 bg-gradient-to-br from-primary to-secondary rounded-2xl hover:scale-105 transition-transform shadow-lg">
+  <div class="grid md:grid-cols-2 gap-4 mb-10">
+    <a href="/create" class="block p-6 bg-gradient-to-br from-primary to-secondary rounded-2xl hover:scale-105 transition-transform shadow-lg">
       <div class="text-center">
-        <i data-lucide="gamepad-2" class="w-10 h-10 mx-auto mb-4"></i>
-        <h2 class="text-2xl font-bold mb-2">방 만들기</h2>
-        <p class="text-white/80">새로운 게임을 시작하세요</p>
+        <i data-lucide="gamepad-2" class="w-8 h-8 mx-auto mb-3"></i>
+        <h2 class="text-xl font-bold mb-1">방 만들기</h2>
+        <p class="text-white/80 text-sm">새로운 게임을 시작하세요</p>
       </div>
     </a>
 
-    <a href="/join" class="block p-8 bg-gray-800 border-2 border-gray-700 rounded-2xl hover:border-primary hover:scale-105 transition-all">
+    <a href="/join" class="block p-6 bg-gray-800 border-2 border-gray-700 rounded-2xl hover:border-primary hover:scale-105 transition-all">
       <div class="text-center">
-        <i data-lucide="door-open" class="w-10 h-10 mx-auto mb-4"></i>
-        <h2 class="text-2xl font-bold mb-2">방 참가하기</h2>
-        <p class="text-gray-400">코드로 방에 참가하세요</p>
+        <i data-lucide="door-open" class="w-8 h-8 mx-auto mb-3"></i>
+        <h2 class="text-xl font-bold mb-1">방 참가하기</h2>
+        <p class="text-gray-400 text-sm">코드로 방에 참가하세요</p>
       </div>
     </a>
   </div>
@@ -71,6 +120,62 @@
 </div>
 
 <script>
+function nicknameCard() {
+  return {
+    nickname: localStorage.getItem('nickname') || (typeof generateRandomNickname === 'function' ? generateRandomNickname() : ''),
+    tempNickname: '',
+    editing: false,
+    error: '',
+
+    init() {
+      if (!this.nickname) {
+        this.nickname = generateRandomNickname();
+        localStorage.setItem('nickname', this.nickname);
+      }
+    },
+
+    startEdit() {
+      this.tempNickname = this.nickname;
+      this.editing = true;
+      this.error = '';
+      this.$nextTick(() => {
+        this.$refs.nicknameInput?.focus();
+        this.$refs.nicknameInput?.select();
+      });
+    },
+
+    saveNickname() {
+      const trimmed = this.tempNickname.trim();
+
+      if (trimmed.length < 2) {
+        this.error = '닉네임은 2자 이상이어야 합니다.';
+        return;
+      }
+      if (trimmed.length > 10) {
+        this.error = '닉네임은 10자 이하여야 합니다.';
+        return;
+      }
+
+      this.nickname = trimmed;
+      localStorage.setItem('nickname', trimmed);
+      this.editing = false;
+      this.error = '';
+    },
+
+    cancelEdit() {
+      this.editing = false;
+      this.error = '';
+    },
+
+    randomize() {
+      this.nickname = generateRandomNickname();
+      localStorage.setItem('nickname', this.nickname);
+      this.editing = false;
+      this.error = '';
+    }
+  }
+}
+
 function lobbyData() {
   return {
     rooms: ${JSON.stringify(publicRooms)},

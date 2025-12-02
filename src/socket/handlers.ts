@@ -2,6 +2,11 @@ import { Server, Socket } from 'socket.io';
 import { roomManager } from '../game/RoomManager';
 import { GameMode } from '../game/types';
 
+// XSS 방지 - 위험한 문자 제거
+function sanitizeInput(input: string, maxLength: number = 100): string {
+  return input?.slice(0, maxLength).replace(/[<>]/g, '') || '';
+}
+
 export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
     console.log(`Client connected: ${socket.id}`);
@@ -24,7 +29,10 @@ export function setupSocketHandlers(io: Server): void {
       defenseTime: number;
       category: string;
     }) => {
-      const { nickname, roomName, isPublic, maxPlayers, gameMode, descriptionTime, discussionTime, defenseTime, category } = data;
+      // XSS 방지
+      const nickname = sanitizeInput(data.nickname, 10);
+      const roomName = sanitizeInput(data.roomName, 20);
+      const { isPublic, maxPlayers, gameMode, descriptionTime, discussionTime, defenseTime, category } = data;
 
       // 유효성 검사
       if (!nickname || nickname.length < 2 || nickname.length > 10) {
@@ -61,7 +69,9 @@ export function setupSocketHandlers(io: Server): void {
 
     // 방 참가
     socket.on('join-room', (data: { roomCode: string; nickname: string }) => {
-      const { roomCode, nickname } = data;
+      const { roomCode } = data;
+      // XSS 방지
+      const nickname = sanitizeInput(data.nickname, 10);
 
       if (!nickname || nickname.length < 2 || nickname.length > 10) {
         socket.emit('error', { message: '닉네임은 2-10자 사이여야 합니다.' });
@@ -161,7 +171,8 @@ export function setupSocketHandlers(io: Server): void {
       const room = roomManager.getRoomByPlayerId(socket.id);
       if (!room || !room.game) return;
 
-      const description = data.description?.slice(0, 100) || '...';
+      // XSS 방지
+      const description = sanitizeInput(data.description, 100) || '...';
       const prevDescriber = room.getCurrentDescriberId();
 
       if (!room.submitDescription(socket.id, description)) {
@@ -205,7 +216,8 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
-      const message = data.message?.slice(0, 200) || '';
+      // XSS 방지
+      const message = sanitizeInput(data.message, 200);
       if (!message) return;
 
       io.to(room.code).emit('chat-message', {
@@ -298,38 +310,50 @@ export function setupSocketHandlers(io: Server): void {
       // 모두 투표했는지 확인
       if (room.allFinalVoted()) {
         const result = room.calculateFinalVoteResult();
+        const roomCode = room.code;
+        const nominatedPlayerId = room.game.nominatedPlayerId;
+        const liarId = room.game.liarId;
 
-        io.to(room.code).emit('final-vote-result', {
+        // 결과 브로드캐스트 (찬성/반대 표 수 공개)
+        io.to(roomCode).emit('final-vote-result', {
           agree: result.agree,
           disagree: result.disagree,
           confirmed: result.confirmed,
-          nominatedPlayerId: room.game.nominatedPlayerId
+          nominatedPlayerId
         });
 
-        if (result.confirmed) {
-          // 지목된 사람이 라이어인지 확인
-          const isLiar = room.game.nominatedPlayerId === room.game.liarId;
+        // 5초 후 다음 단계로 진행
+        setTimeout(() => {
+          // 방이 아직 유효한지 확인
+          const currentRoom = roomManager.getRoom(roomCode);
+          if (!currentRoom || !currentRoom.game) return;
 
-          if (isLiar) {
-            // 라이어 정답 맞추기 단계
-            room.startLiarGuess();
-            io.to(room.code).emit('liar-guess-phase', {
-              liarId: room.game.liarId
-            });
+          if (result.confirmed) {
+            // 지목된 사람이 라이어인지 확인
+            const isLiar = nominatedPlayerId === liarId;
+
+            if (isLiar) {
+              // 라이어 정답 맞추기 단계
+              currentRoom.startLiarGuess();
+              io.to(roomCode).emit('liar-guess-phase', {
+                liarId: currentRoom.game.liarId,
+                endTime: currentRoom.game.liarGuessEndTime
+              });
+            } else {
+              // 틀림 - 라이어 승리
+              currentRoom.goToResult();
+              const gameResult = currentRoom.getGameResult();
+              io.to(roomCode).emit('game-end', gameResult);
+            }
           } else {
-            // 틀림 - 라이어 승리
-            room.goToResult();
-            const gameResult = room.getGameResult();
-            io.to(room.code).emit('game-end', gameResult);
+            // 과반수 미달 - 토론 단계로 복귀
+            currentRoom.restartDiscussion();
+            io.to(roomCode).emit('restart-discussion', {
+              reason: 'vote-failed',
+              discussionEndTime: currentRoom.game.discussionEndTime
+            });
           }
-        } else {
-          // 과반수 미달 - 토론 단계로 복귀
-          room.restartDiscussion();
-          io.to(room.code).emit('restart-discussion', {
-            reason: 'vote-failed',
-            discussionEndTime: room.game.discussionEndTime
-          });
-        }
+        }, 5000);
       }
     });
 
@@ -341,7 +365,23 @@ export function setupSocketHandlers(io: Server): void {
       // 라이어만 가능
       if (room.game.liarId !== socket.id) return;
 
-      room.submitLiarGuess(data.word);
+      // XSS 방지
+      const sanitizedWord = data.word?.slice(0, 50).replace(/[<>]/g, '') || '';
+      room.submitLiarGuess(sanitizedWord);
+      const gameResult = room.getGameResult();
+      io.to(room.code).emit('game-end', gameResult);
+    });
+
+    // 라이어 정답 타이머 종료 (호스트가 호출)
+    socket.on('liar-guess-timeout', () => {
+      const room = roomManager.getRoomByPlayerId(socket.id);
+      if (!room || !room.game || room.state !== 'liar-guess') return;
+
+      // 호스트만 처리
+      if (room.hostId !== socket.id) return;
+
+      // 빈 답으로 제출 처리
+      room.submitLiarGuess('');
       const gameResult = room.getGameResult();
       io.to(room.code).emit('game-end', gameResult);
     });
@@ -371,6 +411,12 @@ export function setupSocketHandlers(io: Server): void {
 }
 
 function handleLeaveRoom(socket: Socket, io: Server): void {
+  // 나가기 전에 방 정보 저장
+  const roomBeforeLeave = roomManager.getRoomByPlayerId(socket.id);
+  const wasInGame = roomBeforeLeave && roomBeforeLeave.state !== 'waiting';
+  const wasLiar = roomBeforeLeave?.game?.liarId === socket.id;
+  const wasDefender = roomBeforeLeave?.game?.nominatedPlayerId === socket.id;
+
   const { room, deleted } = roomManager.leaveRoom(socket.id);
 
   if (room && !deleted) {
@@ -378,6 +424,41 @@ function handleLeaveRoom(socket: Socket, io: Server): void {
       playerId: socket.id,
       newHostId: room.hostId
     });
+
+    // 게임 중 플레이어 이탈 처리
+    if (wasInGame && room.game) {
+      // 3명 미만이면 게임 강제 종료
+      if (room.players.length < 3) {
+        room.resetGame();
+        io.to(room.code).emit('game-interrupted', {
+          reason: '플레이어가 나가서 게임을 계속할 수 없습니다.',
+          room: room.getInfoForClient()
+        });
+      }
+      // 라이어가 나간 경우 → 시민 승리
+      else if (wasLiar) {
+        room.goToResult();
+        io.to(room.code).emit('game-end', {
+          winner: 'citizen',
+          liarId: socket.id,
+          citizenWord: room.game.citizenWord,
+          liarWord: room.game.liarWord,
+          nominatedPlayerId: null,
+          wasLiarCaught: false,
+          liarGuessedCorrectly: false,
+          liarGuess: null,
+          reason: '라이어가 게임을 나갔습니다.'
+        });
+      }
+      // 변론자/지목된 사람이 나간 경우 → 토론 재시작
+      else if (wasDefender && (room.state === 'defense' || room.state === 'final-vote')) {
+        room.restartDiscussion();
+        io.to(room.code).emit('restart-discussion', {
+          reason: 'defender-left',
+          discussionEndTime: room.game.discussionEndTime
+        });
+      }
+    }
   }
 
   socket.leave(room?.code || '');

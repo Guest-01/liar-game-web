@@ -11,6 +11,7 @@ export class GameRoom implements Room {
   descriptionTime: number;
   discussionTime: number;
   defenseTime: number;
+  liarGuessTime: number;
   category: string;
   players: Player[];
   state: RoomState;
@@ -38,9 +39,10 @@ export class GameRoom implements Room {
     this.isPublic = options.isPublic ?? true;
     this.maxPlayers = options.maxPlayers ?? 8;
     this.gameMode = options.gameMode ?? 'normal';
-    this.descriptionTime = options.descriptionTime ?? 30;
-    this.discussionTime = options.discussionTime ?? 180;
-    this.defenseTime = options.defenseTime ?? 30;
+    this.descriptionTime = options.descriptionTime ?? 15;
+    this.discussionTime = options.discussionTime ?? 120;
+    this.defenseTime = options.defenseTime ?? 15;
+    this.liarGuessTime = 15; // 라이어 정답 맞추기 시간 (15초 고정)
     this.category = options.category ?? '음식';
     this.players = [];
     this.state = 'waiting';
@@ -143,6 +145,7 @@ export class GameRoom implements Room {
       finalVotes: {},
       discussionEndTime: 0,
       defenseEndTime: 0,
+      liarGuessEndTime: 0,
       liarGuess: null
     };
 
@@ -337,6 +340,7 @@ export class GameRoom implements Room {
   startLiarGuess(): void {
     if (!this.game) return;
     this.state = 'liar-guess';
+    this.game.liarGuessEndTime = Date.now() + this.liarGuessTime * 1000;
     this.updateActivity();
   }
 

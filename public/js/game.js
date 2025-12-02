@@ -41,6 +41,8 @@ function gameRoom() {
     // 최종 투표
     myFinalVote: null,
     finalVoteCount: 0,
+    voteResult: null,  // { agree, disagree, confirmed, countdown }
+    voteResultInterval: null,
 
     // 라이어 정답
     liarId: null,
@@ -190,6 +192,10 @@ function gameRoom() {
       // 채팅 메시지
       this.socket.on('chat-message', (data) => {
         this.chatMessages.push(data);
+        // 메모리 제한: 최근 100개만 유지
+        if (this.chatMessages.length > 100) {
+          this.chatMessages = this.chatMessages.slice(-100);
+        }
         this.$nextTick(() => {
           // 모바일 채팅과 사이드바 채팅 모두 스크롤
           const containers = [this.$refs.chatContainer, this.$refs.sidebarChatContainer];
@@ -243,17 +249,48 @@ function gameRoom() {
 
       // 최종 투표 결과
       this.socket.on('final-vote-result', (data) => {
-        // 결과는 game-end, liar-guess-phase, 또는 restart-discussion에서 처리
+        // 카운트다운 인터벌 정리
+        if (this.voteResultInterval) {
+          clearInterval(this.voteResultInterval);
+        }
+
+        this.voteResult = {
+          agree: data.agree,
+          disagree: data.disagree,
+          confirmed: data.confirmed,
+          nominatedPlayerId: data.nominatedPlayerId,
+          countdown: 5
+        };
+
+        // 5초 카운트다운
+        this.voteResultInterval = setInterval(() => {
+          if (this.voteResult && this.voteResult.countdown > 0) {
+            this.voteResult.countdown--;
+          }
+          if (this.voteResult && this.voteResult.countdown <= 0) {
+            clearInterval(this.voteResultInterval);
+            this.voteResultInterval = null;
+          }
+        }, 1000);
       });
 
       // 토론 재시작 (최종 투표 과반 미달)
       this.socket.on('restart-discussion', (data) => {
         this.room.state = 'discussion';
-        this.nominatedPlayerId = null;
+        // 지목 데이터 초기화
+        this.myNomination = null;
+        this.nominations = {};
+        this.defenderId = null;
+        // 투표 데이터 초기화
         this.myFinalVote = null;
         this.finalVoteCount = 0;
-        this.discussionEndTime = data.discussionEndTime;
-        this.startTimer();
+        this.voteResult = null;
+        if (this.voteResultInterval) {
+          clearInterval(this.voteResultInterval);
+          this.voteResultInterval = null;
+        }
+        // 타이머 시작 (버그 수정: endTime 전달)
+        this.startTimer(data.discussionEndTime);
         showToast('과반수 동의를 얻지 못해 토론을 재시작합니다.', 'info');
       });
 
@@ -261,12 +298,25 @@ function gameRoom() {
       this.socket.on('liar-guess-phase', (data) => {
         this.room.state = 'liar-guess';
         this.liarId = data.liarId;
+        this.liarGuessInput = '';
+        this.voteResult = null;
+        if (this.voteResultInterval) {
+          clearInterval(this.voteResultInterval);
+          this.voteResultInterval = null;
+        }
+        // 타이머 시작 (30초)
+        this.startTimer(data.endTime);
       });
 
       // 게임 종료
       this.socket.on('game-end', (data) => {
         this.room.state = 'result';
         this.gameResult = data;
+        this.voteResult = null;
+        if (this.voteResultInterval) {
+          clearInterval(this.voteResultInterval);
+          this.voteResultInterval = null;
+        }
         this.stopTimer();
       });
 
@@ -274,6 +324,13 @@ function gameRoom() {
       this.socket.on('game-reset', (data) => {
         this.room = data.room;
         this.resetGameState();
+      });
+
+      // 게임 중단 (플레이어 이탈 등)
+      this.socket.on('game-interrupted', (data) => {
+        this.room = data.room;
+        this.resetGameState();
+        showToast(data.reason, 'error');
       });
 
       // 에러
@@ -406,6 +463,9 @@ function gameRoom() {
       } else if (this.room.state === 'defense' && this.isHost) {
         // 호스트가 변론 종료 알림
         this.socket.emit('defense-end');
+      } else if (this.room.state === 'liar-guess' && this.isHost) {
+        // 호스트가 라이어 정답 타이머 종료 알림
+        this.socket.emit('liar-guess-timeout');
       }
     },
 

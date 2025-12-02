@@ -60,6 +60,17 @@
       0%, 100% { border-color: #6366f1; }
       50% { border-color: #8b5cf6; }
     }
+
+    /* 타이머 경고 깜박임 */
+    .timer-warning {
+      animation: timerBlink 0.5s ease-in-out infinite;
+      color: #ef4444;
+    }
+
+    @keyframes timerBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
   </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
