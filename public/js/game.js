@@ -97,8 +97,9 @@ function gameRoom() {
         this.playerId = this.socket.id;
         this.connecting = false;
 
-        // 닉네임이 있으면 자동 참가
-        if (this.nickname && this.nickname.length >= 2) {
+        // URL에 nickname 파라미터가 있을 때만 자동 참가 (로비에서 온 경우)
+        // 링크로 직접 입장한 경우는 모달 표시하여 닉네임 확인/수정 기회 제공
+        if (urlParams.has('nickname') && this.nickname && this.nickname.length >= 2) {
           this.joinRoom();
         }
       });

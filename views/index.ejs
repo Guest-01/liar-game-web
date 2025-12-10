@@ -109,7 +109,7 @@
                 <span class="flex items-center gap-1"><i data-lucide="folder" class="w-4 h-4"></i> <span x-text="room.category"></span></span>
               </div>
             </div>
-            <a :href="'/room/' + room.code" class="px-6 py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold transition-colors">
+            <a :href="'/room/' + room.code + '?nickname=' + encodeURIComponent(localStorage.getItem('nickname') || '')" class="px-6 py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold transition-colors">
               참가
             </a>
           </div>

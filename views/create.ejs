@@ -203,7 +203,7 @@ function createRoomForm() {
       socket.on('room-created', (data) => {
         // 세션에 소켓 ID 저장 후 리다이렉트
         sessionStorage.setItem('socketId', socket.id);
-        window.location.href = '/room/' + data.roomCode;
+        window.location.href = '/room/' + data.roomCode + '?nickname=' + encodeURIComponent(this.nickname);
       });
 
       socket.on('error', (data) => {
