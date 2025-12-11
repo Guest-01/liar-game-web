@@ -135,6 +135,18 @@ function gameRoom() {
         }
       });
 
+      // 강퇴당함
+      this.socket.on('kicked', (data) => {
+        showToast(data.message, 'error');
+        window.location.href = '/';
+      });
+
+      // 다른 플레이어가 강퇴됨
+      this.socket.on('player-kicked', (data) => {
+        this.room.players = this.room.players.filter(p => p.id !== data.playerId);
+        showToast(`${data.nickname}님이 강퇴되었습니다.`);
+      });
+
       // 게임 시작
       this.socket.on('game-started', (data) => {
         this.myWord = { word: data.word, isLiar: data.isLiar };
@@ -359,6 +371,11 @@ function gameRoom() {
     leaveRoom() {
       this.socket.emit('leave-room');
       window.location.href = '/';
+    },
+
+    // 플레이어 강퇴
+    kickPlayer(targetId) {
+      this.socket.emit('kick-player', { targetId });
     },
 
     // 게임 시작

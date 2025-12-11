@@ -113,6 +113,14 @@
                   <i x-show="!player.isHost" data-lucide="user" class="w-4 h-4 flex-shrink-0"></i>
                   <span class="font-medium truncate text-sm" x-text="player.nickname"></span>
                   <span x-show="player.id === playerId" class="text-xs text-primary ml-auto">(나)</span>
+                  <button
+                    x-show="isHost && player.id !== playerId"
+                    @click="kickPlayer(player.id)"
+                    class="ml-auto p-1 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded"
+                    title="강퇴"
+                  >
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
                 </div>
               </template>
             </div>
@@ -494,6 +502,14 @@
                 <i x-show="!player.isHost" data-lucide="user" class="w-4 h-4 flex-shrink-0"></i>
                 <span class="font-medium truncate text-sm" x-text="player.nickname"></span>
                 <span x-show="player.id === playerId" class="text-xs text-primary ml-auto">(나)</span>
+                <button
+                  x-show="isHost && player.id !== playerId && room.state === 'waiting'"
+                  @click="kickPlayer(player.id)"
+                  class="ml-auto p-1 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded"
+                  title="강퇴"
+                >
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
               </div>
             </template>
           </div>

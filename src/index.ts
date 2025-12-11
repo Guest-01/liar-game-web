@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { createSocketServer } from './socket';
 import { roomManager } from './game/RoomManager';
 import { getCategoryNames } from './data/words';
+import logger from './logger';
 
 // 환경 변수 로드
 dotenv.config();
@@ -84,11 +85,25 @@ app.get('/api/rooms/:code', (req, res) => {
 setInterval(() => {
   const cleaned = roomManager.cleanupInactiveRooms();
   if (cleaned > 0) {
-    console.log(`Cleaned up ${cleaned} inactive rooms`);
+    logger.info({ cleaned }, `비활성 방 ${cleaned}개 정리됨`);
   }
 }, 10 * 60 * 1000);
 
 // 서버 시작
 httpServer.listen(PORT, () => {
-  console.log(`🎮 라이어 게임 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+  logger.info({ port: PORT }, `🎮 라이어 게임 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
 });
+
+// Graceful shutdown
+const shutdown = () => {
+  logger.info('🛑 서버를 종료합니다...');
+  io.close(() => {
+    httpServer.close(() => {
+      logger.info('✅ 서버가 정상적으로 종료되었습니다.');
+      process.exit(0);
+    });
+  });
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
