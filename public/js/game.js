@@ -10,6 +10,7 @@ function gameRoom() {
     // 플레이어 정보
     playerId: '',
     nickname: localStorage.getItem('nickname') || (typeof generateRandomNickname === 'function' ? generateRandomNickname() : ''),
+    passwordInput: '',  // 비공개 방 비밀번호 입력
 
     // 방 정보
     room: window.INITIAL_ROOM || {},
@@ -360,14 +361,16 @@ function gameRoom() {
 
       localStorage.setItem('nickname', this.nickname);
 
-      // URL에서 비밀번호 파라미터 확인
+      // URL 파라미터에서 비밀번호, 호스트 토큰 확인
       const urlParams = new URLSearchParams(window.location.search);
-      const password = urlParams.get('password') || undefined;
+      const password = this.passwordInput || urlParams.get('password') || undefined;
+      const hostToken = urlParams.get('hostToken') || undefined;
 
       this.socket.emit('join-room', {
         roomId: window.ROOM_ID,
         nickname: this.nickname,
-        password
+        password,
+        hostToken
       });
     },
 

@@ -2,58 +2,12 @@
 <div x-data="lobbyPage()" x-init="init()" class="container mx-auto px-4 py-8 max-w-6xl">
   <!-- 헤더 (모바일에서만 표시) -->
   <header class="text-center mb-8 lg:hidden">
-    <h1 class="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2 flex items-center justify-center gap-3">
-      <i data-lucide="drama" class="w-10 h-10 text-primary"></i> 라이어 게임
+    <h1 class="text-4xl font-bold mb-2 flex items-center justify-center gap-3">
+      <i data-lucide="drama" class="w-10 h-10 text-primary"></i>
+      <span class="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent animate-glitch">라이어 게임</span>
     </h1>
     <p class="text-gray-400">누가 라이어인지 찾아내세요!</p>
-    <button @click="showHelp = true" class="mt-3 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-gray-300 inline-flex items-center gap-2 transition-colors">
-      <i data-lucide="help-circle" class="w-4 h-4"></i> 게임 방법
-    </button>
   </header>
-
-  <!-- 게임 방법 모달 -->
-  <div x-show="showHelp" x-cloak class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-    <div class="bg-gray-800 rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto" @click.outside="showHelp = false">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-bold flex items-center gap-2">
-          <i data-lucide="help-circle" class="w-5 h-5 text-primary"></i> 게임 방법
-        </h3>
-        <button @click="showHelp = false" class="p-1 hover:bg-gray-700 rounded-lg transition-colors">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="space-y-4 text-sm">
-        <div>
-          <h4 class="font-semibold text-gray-200 mb-2">기본 규칙</h4>
-          <ul class="text-gray-400 space-y-1.5">
-            <li>• 한 명의 라이어를 제외한 모든 플레이어가 같은 제시어를 받습니다</li>
-            <li>• 돌아가며 제시어를 설명하고, 토론을 통해 라이어를 찾아내세요</li>
-            <li>• 투표로 지목된 사람이 라이어면 시민 승리!</li>
-            <li>• 라이어가 정답을 맞추면 역전 승리!</li>
-          </ul>
-        </div>
-
-        <div class="border-t border-gray-700 pt-4">
-          <h4 class="font-semibold text-gray-200 mb-2 flex items-center gap-2">
-            <i data-lucide="target" class="w-4 h-4 text-primary"></i> 일반 모드
-          </h4>
-          <p class="text-gray-400">라이어는 자신이 라이어인 것을 알고 있으며, 제시어를 받지 못합니다. 다른 사람들의 설명을 듣고 제시어를 유추해야 합니다.</p>
-        </div>
-
-        <div class="border-t border-gray-700 pt-4">
-          <h4 class="font-semibold text-gray-200 mb-2 flex items-center gap-2">
-            <i data-lucide="smile" class="w-4 h-4 text-primary"></i> 바보 모드
-          </h4>
-          <p class="text-gray-400">라이어도 자신이 라이어인지 모릅니다! 라이어는 다른 제시어를 받아서 본인도 헷갈리게 됩니다.</p>
-        </div>
-      </div>
-
-      <button @click="showHelp = false" class="w-full mt-6 py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold transition-colors">
-        확인
-      </button>
-    </div>
-  </div>
 
   <!-- 2단 레이아웃 -->
   <div class="lg:grid lg:grid-cols-5 lg:gap-8">
@@ -61,8 +15,9 @@
     <div class="lg:col-span-2 mb-8 lg:mb-0">
       <!-- 헤더 (데스크톱에서만 표시) -->
       <header class="hidden lg:block mb-8">
-        <h1 class="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2 flex items-center gap-3">
-          <i data-lucide="drama" class="w-10 h-10 text-primary"></i> 라이어 게임
+        <h1 class="text-4xl font-bold mb-2 flex items-center gap-3">
+          <i data-lucide="drama" class="w-10 h-10 text-primary"></i>
+          <span class="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent animate-glitch">라이어 게임</span>
         </h1>
         <p class="text-gray-400">누가 라이어인지 찾아내세요!</p>
       </header>
@@ -125,24 +80,35 @@
         <p x-show="!error && editing" class="mt-2 text-sm text-gray-500">2-10자 사이로 입력하세요</p>
       </div>
 
-      <!-- 게임 설명 (데스크톱에서만) -->
-      <div class="hidden lg:block mt-6 bg-gray-800/50 rounded-xl p-5 border border-gray-700/50">
-        <h3 class="font-semibold text-gray-300 mb-3 flex items-center gap-2">
-          <i data-lucide="info" class="w-4 h-4"></i> 게임 방법
-        </h3>
-        <ul class="text-sm text-gray-400 space-y-1.5 mb-4">
-          <li>• 라이어를 제외한 모든 플레이어가 같은 제시어를 받습니다</li>
-          <li>• 돌아가며 제시어를 설명하고, 토론으로 라이어를 찾으세요</li>
-          <li>• 라이어가 들키면 시민 승리, 정답을 맞추면 라이어 역전!</li>
-        </ul>
-        <div class="space-y-2 text-xs">
-          <div class="flex items-center gap-2 text-gray-500">
-            <i data-lucide="target" class="w-3.5 h-3.5"></i>
-            <span><strong class="text-gray-400">일반</strong>: 라이어는 제시어 없이 유추해야 함</span>
-          </div>
-          <div class="flex items-center gap-2 text-gray-500">
-            <i data-lucide="smile" class="w-3.5 h-3.5"></i>
-            <span><strong class="text-gray-400">바보</strong>: 라이어도 자신이 라이어인지 모름</span>
+      <!-- 게임 설명 (펼침/접힘) -->
+      <div x-data="{ open: window.innerWidth >= 1024 }" class="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
+        <button
+          @click="open = !open; $nextTick(() => lucide.createIcons())"
+          class="w-full p-4 flex items-center justify-between text-left hover:bg-gray-700/30 transition-colors"
+        >
+          <h3 class="font-semibold text-gray-300 flex items-center gap-2">
+            <i data-lucide="info" class="w-4 h-4"></i> 게임 방법
+          </h3>
+          <i x-show="!open" data-lucide="chevron-down" class="w-4 h-4 text-gray-500"></i>
+          <i x-show="open" data-lucide="chevron-up" class="w-4 h-4 text-gray-500"></i>
+        </button>
+        <div x-show="open" x-collapse>
+          <div class="px-4 pb-4 space-y-3">
+            <ul class="text-sm text-gray-400 space-y-1.5">
+              <li>• 라이어를 제외한 모든 플레이어가 같은 제시어를 받습니다</li>
+              <li>• 돌아가며 제시어를 설명하고, 토론으로 라이어를 찾으세요</li>
+              <li>• 라이어가 들키면 시민 승리, 정답을 맞추면 라이어 역전!</li>
+            </ul>
+            <div class="space-y-2 text-xs">
+              <div class="flex items-center gap-2 text-gray-500">
+                <i data-lucide="target" class="w-3.5 h-3.5"></i>
+                <span><strong class="text-gray-400">일반</strong>: 라이어는 제시어 없이 유추해야 함</span>
+              </div>
+              <div class="flex items-center gap-2 text-gray-500">
+                <i data-lucide="smile" class="w-3.5 h-3.5"></i>
+                <span><strong class="text-gray-400">바보</strong>: 라이어도 자신이 라이어인지 모름</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -216,29 +182,41 @@
         </template>
       </div>
 
-      <!-- 비밀번호 입력 모달 -->
-      <div x-show="passwordModal.show" x-cloak class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-        <div class="bg-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4" @click.outside="passwordModal.show = false">
+      <!-- 방 참가 모달 (비공개 방) -->
+      <div x-show="joinModal.show" x-cloak class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-2xl p-6 max-w-sm w-full mx-4" @click.outside="joinModal.show = false">
           <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-            <i data-lucide="lock" class="w-5 h-5 text-yellow-400"></i> 비밀번호 입력
+            <i data-lucide="lock" class="w-5 h-5 text-yellow-400"></i>
+            <span x-text="joinModal.roomName"></span>
           </h3>
-          <p class="text-gray-400 mb-4 text-sm">
-            <span x-text="passwordModal.roomName"></span> 방에 참가하려면 비밀번호를 입력하세요.
-          </p>
-          <form @submit.prevent="submitPassword()">
-            <input
-              type="password"
-              x-model="passwordModal.password"
-              x-ref="passwordInput"
-              placeholder="비밀번호"
-              class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg mb-4 focus:ring-2 focus:ring-primary outline-none"
-            >
-            <div x-show="passwordModal.error" class="text-red-400 text-sm mb-4" x-text="passwordModal.error"></div>
+          <form @submit.prevent="submitJoin()">
+            <div class="mb-4">
+              <label class="block text-sm text-gray-400 mb-1">닉네임</label>
+              <input
+                type="text"
+                x-model="joinModal.nickname"
+                placeholder="닉네임 (2-10자)"
+                minlength="2"
+                maxlength="10"
+                class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+              >
+            </div>
+            <div class="mb-4">
+              <label class="block text-sm text-gray-400 mb-1">비밀번호</label>
+              <input
+                type="password"
+                x-model="joinModal.password"
+                x-ref="passwordInput"
+                placeholder="비밀번호"
+                class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+              >
+            </div>
+            <div x-show="joinModal.error" class="text-red-400 text-sm mb-4" x-text="joinModal.error"></div>
             <div class="flex gap-2">
-              <button type="button" @click="passwordModal.show = false" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold">취소</button>
-              <button type="submit" :disabled="passwordModal.loading" class="flex-1 py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold">
-                <span x-show="!passwordModal.loading">참가</span>
-                <span x-show="passwordModal.loading">확인 중...</span>
+              <button type="button" @click="joinModal.show = false" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold">취소</button>
+              <button type="submit" :disabled="joinModal.loading" class="flex-1 py-3 bg-primary hover:bg-primary/80 rounded-lg font-semibold disabled:opacity-50">
+                <span x-show="!joinModal.loading">참가</span>
+                <span x-show="joinModal.loading">확인 중...</span>
               </button>
             </div>
           </form>
@@ -261,7 +239,6 @@
 <script>
 function lobbyPage() {
   return {
-    showHelp: false,
     errorMessage: '',
 
     init() {
@@ -337,18 +314,40 @@ function lobbyData() {
   return {
     rooms: ${JSON.stringify(lobbyRooms)},
     loading: false,
-    passwordModal: {
+    socket: null,
+    joinModal: {
       show: false,
       roomId: null,
       roomName: '',
+      nickname: localStorage.getItem('nickname') || '',
       password: '',
       error: '',
       loading: false
     },
 
     init() {
+      // 초기 렌더링 후 Lucide 아이콘 생성
+      this.$nextTick(() => lucide.createIcons());
+
       // 주기적으로 새로고침
       setInterval(() => this.refresh(), 10000);
+
+      // 소켓 연결 (검증용)
+      this.socket = io();
+      this.socket.on('verify-join-result', (data) => {
+        this.joinModal.loading = false;
+        if (data.success) {
+          // 검증 성공: 페이지 이동
+          localStorage.setItem('nickname', this.joinModal.nickname);
+          const url = '/room/' + this.joinModal.roomId +
+            '?nickname=' + encodeURIComponent(this.joinModal.nickname) +
+            '&password=' + encodeURIComponent(this.joinModal.password);
+          window.location.href = url;
+        } else {
+          // 검증 실패: 에러 표시
+          this.joinModal.error = data.message;
+        }
+      });
     },
 
     async refresh() {
@@ -370,11 +369,12 @@ function lobbyData() {
         // 공개 방: 바로 이동
         window.location.href = '/room/' + room.id + '?nickname=' + encodeURIComponent(nickname);
       } else {
-        // 비공개 방: 비밀번호 모달 표시
-        this.passwordModal = {
+        // 비공개 방: 모달 표시
+        this.joinModal = {
           show: true,
           roomId: room.id,
           roomName: room.name,
+          nickname: nickname,
           password: '',
           error: '',
           loading: false
@@ -386,17 +386,29 @@ function lobbyData() {
       }
     },
 
-    submitPassword() {
-      if (!this.passwordModal.password) {
-        this.passwordModal.error = '비밀번호를 입력하세요.';
+    submitJoin() {
+      // 클라이언트 기본 검증
+      if (!this.joinModal.nickname || this.joinModal.nickname.length < 2) {
+        this.joinModal.error = '닉네임은 2자 이상이어야 합니다.';
+        return;
+      }
+      if (this.joinModal.nickname.length > 10) {
+        this.joinModal.error = '닉네임은 10자 이하여야 합니다.';
+        return;
+      }
+      if (!this.joinModal.password) {
+        this.joinModal.error = '비밀번호를 입력하세요.';
         return;
       }
 
-      const nickname = localStorage.getItem('nickname') || '';
-      const url = '/room/' + this.passwordModal.roomId +
-        '?nickname=' + encodeURIComponent(nickname) +
-        '&password=' + encodeURIComponent(this.passwordModal.password);
-      window.location.href = url;
+      // 서버에 검증 요청
+      this.joinModal.loading = true;
+      this.joinModal.error = '';
+      this.socket.emit('verify-join', {
+        roomId: this.joinModal.roomId,
+        nickname: this.joinModal.nickname,
+        password: this.joinModal.password
+      });
     }
   }
 }

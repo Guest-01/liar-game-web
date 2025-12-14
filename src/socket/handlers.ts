@@ -18,6 +18,53 @@ export function setupSocketHandlers(io: Server): void {
       socket.emit('lobby-rooms', { rooms });
     });
 
+    // 방 입장 검증 (로비에서 미리 검증)
+    socket.on('verify-join', (data: { roomId: string; nickname: string; password?: string }) => {
+      const { roomId, password } = data;
+      const nickname = data.nickname?.slice(0, 10).replace(/[<>]/g, '') || '';
+
+      // 닉네임 유효성 검사
+      if (!nickname || nickname.length < 2 || nickname.length > 10) {
+        socket.emit('verify-join-result', { success: false, error: 'invalid-nickname', message: '닉네임은 2-10자 사이여야 합니다.' });
+        return;
+      }
+
+      const room = roomManager.getRoom(roomId);
+      if (!room) {
+        socket.emit('verify-join-result', { success: false, error: 'room-not-found', message: '방이 존재하지 않습니다.' });
+        return;
+      }
+
+      // 게임 중이면 참가 불가
+      if (room.state !== 'waiting') {
+        socket.emit('verify-join-result', { success: false, error: 'game-in-progress', message: '게임이 진행 중입니다.' });
+        return;
+      }
+
+      // 비공개 방 비밀번호 검증
+      if (!room.isPublic && room.password) {
+        if (!password || password !== room.password) {
+          socket.emit('verify-join-result', { success: false, error: 'invalid-password', message: '비밀번호가 틀렸습니다.' });
+          return;
+        }
+      }
+
+      // 닉네임 중복 검사 (같은 닉네임이 이미 있는지)
+      if (room.players.find(p => p.nickname === nickname)) {
+        socket.emit('verify-join-result', { success: false, error: 'duplicate-nickname', message: '이미 같은 닉네임이 사용 중입니다.' });
+        return;
+      }
+
+      // 방이 가득 찼는지 확인
+      if (room.players.length >= room.maxPlayers) {
+        socket.emit('verify-join-result', { success: false, error: 'room-full', message: '방이 가득 찼습니다.' });
+        return;
+      }
+
+      // 모든 검증 통과
+      socket.emit('verify-join-result', { success: true });
+    });
+
     // 방 생성
     socket.on('create-room', (data: {
       nickname: string;
@@ -52,7 +99,7 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
-      const room = roomManager.createRoom(socket.id, nickname, roomName, {
+      const result = roomManager.createRoom(roomName, {
         isPublic: isPublic === true,
         password,
         maxPlayers: Math.min(8, Math.max(3, maxPlayers)),
@@ -63,24 +110,22 @@ export function setupSocketHandlers(io: Server): void {
         category
       });
 
-      if (!room) {
+      if (!result) {
         socket.emit('error', { message: '방을 생성할 수 없습니다.' });
         return;
       }
 
-      socket.join(room.id);
-      socket.emit('room-created', { roomId: room.id });
-      socket.emit('room-joined', {
-        room: room.getInfoForClient(),
-        playerId: socket.id
-      });
+      const { room, hostToken } = result;
+
+      // 방 생성만 하고, 호스트는 hostToken과 함께 리다이렉트 후 참가
+      socket.emit('room-created', { roomId: room.id, hostToken });
 
       logger.info({ roomId: room.id, nickname, roomName }, `방 생성 | ${room.id} | ${nickname} | ${roomName}`);
     });
 
     // 방 참가
-    socket.on('join-room', (data: { roomId: string; nickname: string; password?: string }) => {
-      const { roomId, password } = data;
+    socket.on('join-room', (data: { roomId: string; nickname: string; password?: string; hostToken?: string }) => {
+      const { roomId, password, hostToken } = data;
       // XSS 방지
       const nickname = sanitizeInput(data.nickname, 10);
 
@@ -89,14 +134,14 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
-      const result = roomManager.joinRoom(roomId, socket.id, nickname, password);
+      const result = roomManager.joinRoom(roomId, socket.id, nickname, { password, hostToken });
       if (!result.room) {
         const errorMessages: Record<string, string> = {
           'room-not-found': '방이 존재하지 않습니다.',
           'already-in-room': '이미 다른 방에 있습니다.',
           'game-in-progress': '게임이 진행 중입니다.',
           'invalid-password': '비밀번호가 틀렸습니다.',
-          'duplicate-nickname': '이미 같은 닉네임이 사용 중입니다.',
+          'nickname-duplicate': '이미 같은 닉네임이 사용 중입니다.',
           'room-full': '방이 가득 찼습니다.',
           'join-failed': '방에 참가할 수 없습니다.'
         };

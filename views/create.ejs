@@ -220,7 +220,14 @@ function createRoomForm() {
       });
 
       socket.on('room-created', (data) => {
-        window.location.href = '/room/' + data.roomId + '?nickname=' + encodeURIComponent(this.nickname);
+        let url = '/room/' + data.roomId + '?nickname=' + encodeURIComponent(this.nickname);
+        // 호스트 토큰 전달 (호스트 권한 부여용)
+        url += '&hostToken=' + encodeURIComponent(data.hostToken);
+        // 비공개 방인 경우 비밀번호도 전달
+        if (!this.isPublic && this.password) {
+          url += '&password=' + encodeURIComponent(this.password);
+        }
+        window.location.href = url;
       });
 
       socket.on('error', (data) => {

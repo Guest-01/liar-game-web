@@ -34,7 +34,8 @@
     }
   </script>
 
-  <!-- Alpine.js -->
+  <!-- Alpine.js + Collapse Plugin -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
   <!-- Socket.IO -->
@@ -70,6 +71,63 @@
     @keyframes timerBlink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
+    }
+
+    /* 헤더 애니메이션: 글리치 효과 */
+    .animate-glitch {
+      position: relative;
+      animation: glitchMain 5s infinite;
+    }
+
+    .animate-glitch::before,
+    .animate-glitch::after {
+      content: '라이어 게임';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to right, #6366f1, #8b5cf6);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .animate-glitch::before {
+      text-shadow: 2px 0 #ff00ff;
+      animation: glitchBefore 5s infinite;
+      clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
+    }
+
+    .animate-glitch::after {
+      text-shadow: -2px 0 #00ffff;
+      animation: glitchAfter 5s infinite;
+      clip-path: polygon(0 65%, 100% 65%, 100% 100%, 0 100%);
+    }
+
+    @keyframes glitchMain {
+      0%, 94%, 100% { transform: translate(0); }
+      95% { transform: translate(-2px, 1px); }
+      96% { transform: translate(2px, -1px); }
+      97% { transform: translate(-1px, 2px); }
+      98% { transform: translate(1px, -2px); }
+      99% { transform: translate(2px, 1px); }
+    }
+
+    @keyframes glitchBefore {
+      0%, 94%, 100% { transform: translate(0); opacity: 0; }
+      95% { transform: translate(3px, 0); opacity: 0.8; }
+      96% { transform: translate(-3px, 0); opacity: 0.8; }
+      97% { transform: translate(2px, 0); opacity: 0.8; }
+      98%, 99% { transform: translate(0); opacity: 0; }
+    }
+
+    @keyframes glitchAfter {
+      0%, 94%, 100% { transform: translate(0); opacity: 0; }
+      95% { transform: translate(-3px, 0); opacity: 0.8; }
+      96% { transform: translate(3px, 0); opacity: 0.8; }
+      97% { transform: translate(-2px, 0); opacity: 0.8; }
+      98%, 99% { transform: translate(0); opacity: 0; }
     }
   </style>
 </head>

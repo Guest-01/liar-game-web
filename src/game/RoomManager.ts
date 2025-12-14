@@ -1,16 +1,16 @@
 import { GameRoom } from './Room';
 import { GameMode, LobbyRoomInfo } from './types';
 import { generateRoomId } from '../utils/roomId';
+import { nanoid } from 'nanoid';
 
 export class RoomManager {
   private rooms: Map<string, GameRoom> = new Map();
   private playerToRoom: Map<string, string> = new Map(); // playerId -> roomId
   private pendingDeletions: Map<string, NodeJS.Timeout> = new Map(); // roomId -> timeout
+  private hostTokens: Map<string, string> = new Map(); // roomId -> hostToken
 
-  // 방 생성
+  // 방 생성 (플레이어 추가 없이 방만 생성, hostToken 반환)
   createRoom(
-    hostId: string,
-    hostNickname: string,
     roomName: string,
     options: {
       isPublic?: boolean;
@@ -22,25 +22,23 @@ export class RoomManager {
       defenseTime?: number;
       category?: string;
     } = {}
-  ): GameRoom | null {
-    // 이미 방에 있으면 생성 불가
-    if (this.playerToRoom.has(hostId)) {
-      return null;
-    }
-
+  ): { room: GameRoom; hostToken: string } | null {
     // 고유한 방 ID 생성
     let id: string;
     do {
       id = generateRoomId();
     } while (this.rooms.has(id));
 
-    const room = new GameRoom(id, roomName, hostId, options);
-    room.addPlayer(hostId, hostNickname, true);
+    // 임시 hostId (첫 번째로 hostToken과 함께 참가하는 사람이 호스트가 됨)
+    const room = new GameRoom(id, roomName, '', options);
+
+    // 일회용 호스트 토큰 생성
+    const hostToken = nanoid(16);
+    this.hostTokens.set(id, hostToken);
 
     this.rooms.set(id, room);
-    this.playerToRoom.set(hostId, id);
 
-    return room;
+    return { room, hostToken };
   }
 
   // 방 참가
@@ -48,7 +46,7 @@ export class RoomManager {
     roomId: string,
     playerId: string,
     nickname: string,
-    password?: string
+    options?: { password?: string; hostToken?: string }
   ): { room: GameRoom | null; error?: string } {
     const room = this.rooms.get(roomId);
     if (!room) {
@@ -68,7 +66,7 @@ export class RoomManager {
 
     // 비공개 방 비밀번호 검증
     if (!room.isPublic && room.password) {
-      if (!password || password !== room.password) {
+      if (!options?.password || options.password !== room.password) {
         return { room: null, error: 'invalid-password' };
       }
     }
@@ -88,8 +86,9 @@ export class RoomManager {
     }
 
     // 닉네임 중복 검사
-    if (room.players.find(p => p.nickname === nickname)) {
-      return { room: null, error: 'duplicate-nickname' };
+    const duplicatePlayer = room.players.find(p => p.nickname === nickname);
+    if (duplicatePlayer) {
+      return { room: null, error: 'nickname-duplicate' };
     }
 
     // 방이 가득 찼는지 확인
@@ -97,14 +96,29 @@ export class RoomManager {
       return { room: null, error: 'room-full' };
     }
 
+    // hostToken 검증 - 유효하면 호스트로 입장
+    const isHost = this.validateAndConsumeHostToken(roomId, options?.hostToken);
+
     // 새 플레이어 추가
-    const player = room.addPlayer(playerId, nickname);
+    const player = room.addPlayer(playerId, nickname, isHost);
     if (!player) {
       return { room: null, error: 'join-failed' };
     }
 
     this.playerToRoom.set(playerId, roomId);
     return { room };
+  }
+
+  // 호스트 토큰 검증 및 소비 (일회용)
+  private validateAndConsumeHostToken(roomId: string, token?: string): boolean {
+    if (!token) return false;
+
+    const storedToken = this.hostTokens.get(roomId);
+    if (storedToken && storedToken === token) {
+      this.hostTokens.delete(roomId); // 일회용이므로 삭제
+      return true;
+    }
+    return false;
   }
 
   // 방 나가기
