@@ -44,8 +44,7 @@ app.get('/', (req, res) => {
 
 // 방 생성 페이지
 app.get('/create', (req, res) => {
-  const categories = getCategoryNames();
-  res.render('create', { categories });
+  res.render('create');
 });
 
 // 게임 방
@@ -57,9 +56,11 @@ app.get('/room/:id', (req, res) => {
     return res.redirect('/?error=room-not-found');
   }
 
+  const categories = getCategoryNames();
   res.render('room', {
     roomId: id,
-    room: room.getInfoForClient()
+    room: room.getInfoForClient(),
+    categories
   });
 });
 

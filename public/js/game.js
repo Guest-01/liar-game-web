@@ -14,6 +14,7 @@ function gameRoom() {
 
     // 방 정보
     room: window.INITIAL_ROOM || {},
+    categories: window.CATEGORIES || [],
 
     // 게임 상태
     myWord: { word: null, isLiar: false },
@@ -96,9 +97,15 @@ function gameRoom() {
         this.playerId = this.socket.id;
         this.connecting = false;
 
-        // URL에 nickname 파라미터가 있을 때만 자동 참가 (로비에서 온 경우)
-        // 링크로 직접 입장한 경우는 모달 표시하여 닉네임 확인/수정 기회 제공
-        if (urlParams.has('nickname') && this.nickname && this.nickname.length >= 2) {
+        // 자동 참가 조건:
+        // 1. 로비에서 온 경우 (nickname 파라미터 있음)
+        // 2. 방금 방을 만든 경우 (hostToken 파라미터 있음)
+        // 둘 다 localStorage에 유효한 닉네임이 있어야 함
+        const shouldAutoJoin = (urlParams.has('nickname') || urlParams.has('hostToken'))
+          && this.nickname
+          && this.nickname.length >= 2;
+
+        if (shouldAutoJoin) {
           this.joinRoom();
         }
       });
@@ -151,6 +158,7 @@ function gameRoom() {
         this.myWord = { word: data.word, isLiar: data.isLiar };
         this.room.state = 'word-check';
         this.room.gameMode = data.gameMode;
+        this.room.category = data.category; // 랜덤인 경우 실제 선택된 카테고리로 업데이트
         this.wordRevealed = false;
         this.wordChecked = false;
         this.checkedCount = 0;
@@ -332,6 +340,11 @@ function gameRoom() {
         this.stopTimer();
       });
 
+      // 게임 설정 변경됨
+      this.socket.on('room-settings-updated', (data) => {
+        this.room = data.room;
+      });
+
       // 게임 리셋
       this.socket.on('game-reset', (data) => {
         this.room = data.room;
@@ -433,6 +446,18 @@ function gameRoom() {
     // 게임 재시작
     restartGame() {
       this.socket.emit('restart-game');
+    },
+
+    // 변론 종료 (변론자 전용)
+    endDefense() {
+      if (this.defenderId !== this.playerId) return;
+      this.socket.emit('defense-end');
+    },
+
+    // 게임 설정 변경 (호스트 전용)
+    updateSetting(key, value) {
+      if (!this.isHost) return;
+      this.socket.emit('update-room-settings', { [key]: value });
     },
 
     // 게임 상태 초기화

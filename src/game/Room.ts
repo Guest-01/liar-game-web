@@ -1,5 +1,5 @@
 import { Room, Player, Game, RoomState, GameMode, LobbyRoomInfo, RoomInfoForClient } from './types';
-import { getRandomWordPair } from '../data/words';
+import { getRandomWordPair, getCategoryNames } from '../data/words';
 
 export class GameRoom implements Room {
   id: string;
@@ -40,13 +40,13 @@ export class GameRoom implements Room {
     this.hostId = hostId;
     this.isPublic = options.isPublic ?? true;
     this.password = this.isPublic ? null : (options.password ?? null);
-    this.maxPlayers = options.maxPlayers ?? 8;
+    this.maxPlayers = options.maxPlayers ?? 10;
     this.gameMode = options.gameMode ?? 'normal';
-    this.descriptionTime = options.descriptionTime ?? 15;
+    this.descriptionTime = options.descriptionTime ?? 30;
     this.discussionTime = options.discussionTime ?? 120;
     this.defenseTime = options.defenseTime ?? 15;
     this.liarGuessTime = 15; // 라이어 정답 맞추기 시간 (15초 고정)
-    this.category = options.category ?? '음식';
+    this.category = options.category ?? '랜덤';
     this.players = [];
     this.state = 'waiting';
     this.game = null;
@@ -111,12 +111,20 @@ export class GameRoom implements Room {
     if (this.state !== 'waiting') return false;
     if (this.players.length < 3) return false;
 
+    // 랜덤 카테고리 처리
+    let category = this.category;
+    if (category === '랜덤') {
+      const categories = getCategoryNames();
+      category = categories[Math.floor(Math.random() * categories.length)];
+      this.category = category; // 실제 카테고리로 업데이트
+    }
+
     // 랜덤 라이어 선정
     const liarIndex = Math.floor(Math.random() * this.players.length);
     const liarId = this.players[liarIndex].id;
 
     // 단어 쌍 가져오기
-    const wordPair = getRandomWordPair(this.category);
+    const wordPair = getRandomWordPair(category);
     if (!wordPair) return false;
 
     // 설명 순서 랜덤 셔플
@@ -386,6 +394,45 @@ export class GameRoom implements Room {
   goToResult(): void {
     this.state = 'result';
     this.updateActivity();
+  }
+
+  // 대기실에서 설정 변경 (호스트만 가능)
+  updateSettings(options: {
+    gameMode?: GameMode;
+    maxPlayers?: number;
+    category?: string;
+    descriptionTime?: number;
+    discussionTime?: number;
+    defenseTime?: number;
+  }): boolean {
+    // 대기실에서만 설정 변경 가능
+    if (this.state !== 'waiting') return false;
+
+    if (options.gameMode !== undefined) {
+      this.gameMode = options.gameMode;
+    }
+    if (options.maxPlayers !== undefined) {
+      // 현재 인원보다 작게 설정 불가
+      const newMax = Math.min(10, Math.max(3, options.maxPlayers));
+      if (newMax >= this.players.length) {
+        this.maxPlayers = newMax;
+      }
+    }
+    if (options.category !== undefined) {
+      this.category = options.category;
+    }
+    if (options.descriptionTime !== undefined) {
+      this.descriptionTime = Math.min(60, Math.max(10, options.descriptionTime));
+    }
+    if (options.discussionTime !== undefined) {
+      this.discussionTime = Math.min(300, Math.max(60, options.discussionTime));
+    }
+    if (options.defenseTime !== undefined) {
+      this.defenseTime = Math.min(60, Math.max(10, options.defenseTime));
+    }
+
+    this.updateActivity();
+    return true;
   }
 
   // 게임 재시작 (대기실로)

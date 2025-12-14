@@ -1,27 +1,13 @@
 <%- include('layout', { body: `
 <div class="container mx-auto px-4 py-8 max-w-lg">
   <a href="/" class="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
-    ← 로비로 돌아가기
+    <- 로비로 돌아가기
   </a>
 
   <div class="bg-gray-800 rounded-2xl p-8 shadow-xl">
     <h1 class="text-3xl font-bold text-center mb-8 flex items-center justify-center gap-2"><i data-lucide="gamepad-2" class="w-8 h-8"></i> 방 만들기</h1>
 
     <form x-data="createRoomForm()" @submit.prevent="submit()" class="space-y-6">
-      <!-- 닉네임 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-300 mb-2">닉네임</label>
-        <input
-          type="text"
-          x-model="nickname"
-          placeholder="닉네임을 입력하세요"
-          minlength="2"
-          maxlength="10"
-          required
-          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-        >
-      </div>
-
       <!-- 방 이름 -->
       <div>
         <label class="block text-sm font-medium text-gray-300 mb-2">방 이름</label>
@@ -67,87 +53,7 @@
         <p class="text-xs text-gray-500 mt-1">참가자가 방에 들어올 때 입력해야 합니다</p>
       </div>
 
-      <!-- 게임 모드 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-300 mb-2">게임 모드</label>
-        <div class="flex gap-4">
-          <label class="flex-1 cursor-pointer">
-            <input type="radio" x-model="gameMode" value="normal" class="sr-only peer">
-            <div class="p-4 bg-gray-700 rounded-lg text-center peer-checked:bg-primary peer-checked:ring-2 peer-checked:ring-primary/50 transition-all">
-              <div class="font-semibold flex items-center justify-center gap-1"><i data-lucide="target" class="w-5 h-5"></i> 일반</div>
-              <div class="text-xs text-gray-400 mt-1">라이어가 자신을 앎</div>
-            </div>
-          </label>
-          <label class="flex-1 cursor-pointer">
-            <input type="radio" x-model="gameMode" value="fool" class="sr-only peer">
-            <div class="p-4 bg-gray-700 rounded-lg text-center peer-checked:bg-primary peer-checked:ring-2 peer-checked:ring-primary/50 transition-all">
-              <div class="font-semibold flex items-center justify-center gap-1"><i data-lucide="smile" class="w-5 h-5"></i> 바보</div>
-              <div class="text-xs text-gray-400 mt-1">라이어도 자신을 모름</div>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <!-- 최대 인원 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-300 mb-2">
-          최대 인원: <span x-text="maxPlayers" class="text-primary font-bold"></span>명
-        </label>
-        <input
-          type="range"
-          x-model="maxPlayers"
-          min="3"
-          max="8"
-          class="w-full accent-primary"
-        >
-        <div class="flex justify-between text-xs text-gray-500">
-          <span>3명</span>
-          <span>8명</span>
-        </div>
-      </div>
-
-      <!-- 카테고리 -->
-      <div>
-        <label class="block text-sm font-medium text-gray-300 mb-2">단어 카테고리</label>
-        <select
-          x-model="category"
-          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-        >
-          ${categories.map(c => '<option value="' + c + '">' + c + '</option>').join('')}
-        </select>
-      </div>
-
-      <!-- 시간 설정 -->
-      <div class="grid grid-cols-3 gap-4">
-        <div>
-          <label class="block text-xs font-medium text-gray-400 mb-1">설명 시간</label>
-          <select x-model="descriptionTime" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm">
-            <option value="15">15초</option>
-            <option value="30">30초</option>
-            <option value="45">45초</option>
-            <option value="60">60초</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-400 mb-1">토론 시간</label>
-          <select x-model="discussionTime" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm">
-            <option value="60">1분</option>
-            <option value="120">2분</option>
-            <option value="180">3분</option>
-            <option value="240">4분</option>
-            <option value="300">5분</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-400 mb-1">변론 시간</label>
-          <select x-model="defenseTime" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm">
-            <option value="15">15초</option>
-            <option value="30">30초</option>
-            <option value="45">45초</option>
-            <option value="60">60초</option>
-          </select>
-        </div>
-      </div>
+      <p class="text-sm text-gray-400 text-center">게임 설정은 대기실에서 변경할 수 있습니다</p>
 
       <!-- 에러 메시지 -->
       <div x-show="error" x-text="error" class="text-red-400 text-sm text-center"></div>
@@ -168,24 +74,13 @@
 <script>
 function createRoomForm() {
   return {
-    nickname: localStorage.getItem('nickname') || generateRandomNickname(),
     roomName: '',
     isPublic: true,
     password: '',
-    gameMode: 'normal',
-    maxPlayers: 6,
-    category: '${categories[0]}',
-    descriptionTime: 15,
-    discussionTime: 120,
-    defenseTime: 15,
     loading: false,
     error: '',
 
     submit() {
-      if (this.nickname.length < 2 || this.nickname.length > 10) {
-        this.error = '닉네임은 2-10자 사이여야 합니다.';
-        return;
-      }
       if (!this.roomName) {
         this.error = '방 이름을 입력하세요.';
         return;
@@ -198,31 +93,19 @@ function createRoomForm() {
       this.loading = true;
       this.error = '';
 
-      // 닉네임 저장
-      localStorage.setItem('nickname', this.nickname);
-
       // Socket.IO 연결 및 방 생성
       const socket = io();
 
       socket.on('connect', () => {
         socket.emit('create-room', {
-          nickname: this.nickname,
           roomName: this.roomName,
           isPublic: this.isPublic,
-          password: this.isPublic ? null : this.password,
-          maxPlayers: parseInt(this.maxPlayers),
-          gameMode: this.gameMode,
-          descriptionTime: parseInt(this.descriptionTime),
-          discussionTime: parseInt(this.discussionTime),
-          defenseTime: parseInt(this.defenseTime),
-          category: this.category
+          password: this.isPublic ? null : this.password
         });
       });
 
       socket.on('room-created', (data) => {
-        let url = '/room/' + data.roomId + '?nickname=' + encodeURIComponent(this.nickname);
-        // 호스트 토큰 전달 (호스트 권한 부여용)
-        url += '&hostToken=' + encodeURIComponent(data.hostToken);
+        let url = '/room/' + data.roomId + '?hostToken=' + encodeURIComponent(data.hostToken);
         // 비공개 방인 경우 비밀번호도 전달
         if (!this.isPublic && this.password) {
           url += '&password=' + encodeURIComponent(this.password);

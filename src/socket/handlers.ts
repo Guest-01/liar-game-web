@@ -67,28 +67,16 @@ export function setupSocketHandlers(io: Server): void {
 
     // 방 생성
     socket.on('create-room', (data: {
-      nickname: string;
       roomName: string;
       isPublic: boolean;
       password?: string;
-      maxPlayers: number;
-      gameMode: GameMode;
-      descriptionTime: number;
-      discussionTime: number;
-      defenseTime: number;
-      category: string;
     }) => {
       // XSS 방지
-      const nickname = sanitizeInput(data.nickname, 10);
       const roomName = sanitizeInput(data.roomName, 20);
       const password = data.password ? sanitizeInput(data.password, 20) : null;
-      const { isPublic, maxPlayers, gameMode, descriptionTime, discussionTime, defenseTime, category } = data;
+      const { isPublic } = data;
 
       // 유효성 검사
-      if (!nickname || nickname.length < 2 || nickname.length > 10) {
-        socket.emit('error', { message: '닉네임은 2-10자 사이여야 합니다.' });
-        return;
-      }
       if (!roomName || roomName.length < 1 || roomName.length > 20) {
         socket.emit('error', { message: '방 이름은 1-20자 사이여야 합니다.' });
         return;
@@ -99,15 +87,10 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
+      // 기본값으로 방 생성 (게임 설정은 대기실에서 변경)
       const result = roomManager.createRoom(roomName, {
         isPublic: isPublic === true,
-        password,
-        maxPlayers: Math.min(8, Math.max(3, maxPlayers)),
-        gameMode,
-        descriptionTime: Math.min(60, Math.max(10, descriptionTime)),
-        discussionTime: Math.min(300, Math.max(60, discussionTime)),
-        defenseTime: Math.min(60, Math.max(10, defenseTime)),
-        category
+        password
       });
 
       if (!result) {
@@ -120,7 +103,7 @@ export function setupSocketHandlers(io: Server): void {
       // 방 생성만 하고, 호스트는 hostToken과 함께 리다이렉트 후 참가
       socket.emit('room-created', { roomId: room.id, hostToken });
 
-      logger.info({ roomId: room.id, nickname, roomName }, `방 생성 | ${room.id} | ${nickname} | ${roomName}`);
+      logger.info({ roomId: room.id, roomName }, `방 생성 | ${room.id} | ${roomName}`);
     });
 
     // 방 참가
@@ -210,6 +193,43 @@ export function setupSocketHandlers(io: Server): void {
       });
     });
 
+    // 게임 설정 변경 (대기실에서 호스트만)
+    socket.on('update-room-settings', (data: {
+      gameMode?: GameMode;
+      maxPlayers?: number;
+      category?: string;
+      descriptionTime?: number;
+      discussionTime?: number;
+      defenseTime?: number;
+    }) => {
+      const room = roomManager.getRoomByPlayerId(socket.id);
+      if (!room) return;
+
+      // 호스트만 설정 변경 가능
+      if (room.hostId !== socket.id) {
+        socket.emit('error', { message: '호스트만 설정을 변경할 수 있습니다.' });
+        return;
+      }
+
+      // 대기실에서만 설정 변경 가능
+      if (room.state !== 'waiting') {
+        socket.emit('error', { message: '대기실에서만 설정을 변경할 수 있습니다.' });
+        return;
+      }
+
+      if (!room.updateSettings(data)) {
+        socket.emit('error', { message: '설정을 변경할 수 없습니다.' });
+        return;
+      }
+
+      // 모든 플레이어에게 변경된 설정 브로드캐스트
+      io.to(room.id).emit('room-settings-updated', {
+        room: room.getInfoForClient()
+      });
+
+      logger.info({ roomId: room.id, settings: data }, `설정 변경 | ${room.id}`);
+    });
+
     // 게임 시작
     socket.on('start-game', () => {
       const room = roomManager.getRoomByPlayerId(socket.id);
@@ -237,7 +257,8 @@ export function setupSocketHandlers(io: Server): void {
         io.to(player.id).emit('game-started', {
           word: wordInfo.word,
           isLiar: wordInfo.isLiar,
-          gameMode: room.gameMode
+          gameMode: room.gameMode,
+          category: room.category // 랜덤인 경우 실제 선택된 카테고리
         });
       }
 
@@ -378,12 +399,13 @@ export function setupSocketHandlers(io: Server): void {
       }
     });
 
-    // 최후 변론 종료
+    // 최후 변론 종료 (변론자만 가능)
     socket.on('defense-end', () => {
       const room = roomManager.getRoomByPlayerId(socket.id);
       if (!room || !room.game || room.state !== 'defense') return;
 
-      if (room.hostId !== socket.id) return;
+      // 변론자 본인만 종료 가능
+      if (room.game.nominatedPlayerId !== socket.id) return;
 
       room.startFinalVote();
       io.to(room.id).emit('final-vote-start', {

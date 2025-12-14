@@ -102,21 +102,6 @@ export const categories: WordCategory[] = [
     ]
   },
   {
-    name: "영화/드라마",
-    pairs: [
-      { citizen: "아이언맨", liar: "배트맨" },
-      { citizen: "해리포터", liar: "반지의 제왕" },
-      { citizen: "어벤져스", liar: "저스티스리그" },
-      { citizen: "기생충", liar: "올드보이" },
-      { citizen: "타이타닉", liar: "노트북" },
-      { citizen: "겨울왕국", liar: "모아나" },
-      { citizen: "토이스토리", liar: "슈렉" },
-      { citizen: "스타워즈", liar: "스타트렉" },
-      { citizen: "매트릭스", liar: "인셉션" },
-      { citizen: "쥬라기공원", liar: "킹콩" }
-    ]
-  },
-  {
     name: "브랜드",
     pairs: [
       { citizen: "애플", liar: "삼성" },
@@ -129,21 +114,6 @@ export const categories: WordCategory[] = [
       { citizen: "유튜브", liar: "틱톡" },
       { citizen: "인스타그램", liar: "페이스북" },
       { citizen: "카카오톡", liar: "라인" }
-    ]
-  },
-  {
-    name: "악기",
-    pairs: [
-      { citizen: "피아노", liar: "오르간" },
-      { citizen: "기타", liar: "베이스" },
-      { citizen: "바이올린", liar: "첼로" },
-      { citizen: "드럼", liar: "봉고" },
-      { citizen: "플루트", liar: "클라리넷" },
-      { citizen: "트럼펫", liar: "트롬본" },
-      { citizen: "하프", liar: "가야금" },
-      { citizen: "색소폰", liar: "오보에" },
-      { citizen: "우쿨렐레", liar: "만돌린" },
-      { citizen: "하모니카", liar: "아코디언" }
     ]
   }
 ];
