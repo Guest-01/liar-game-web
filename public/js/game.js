@@ -16,6 +16,13 @@ function gameRoom() {
     room: window.INITIAL_ROOM || {},
     categories: window.CATEGORIES || [],
 
+    // 시간 설정 옵션 (제네릭 컴포넌트용)
+    timeSettings: [
+      { key: 'descriptionTime', label: '설명 시간', values: [15, 30, 60], format: (v) => v + '초' },
+      { key: 'discussionTime', label: '토론 시간', values: [60, 120, 180], format: (v) => (v / 60) + '분' },
+      { key: 'defenseTime', label: '변론 시간', values: [15, 30, 60], format: (v) => v + '초' }
+    ],
+
     // 게임 상태
     myWord: { word: null, isLiar: false },
     wordRevealed: false,
@@ -217,12 +224,9 @@ function gameRoom() {
           this.chatMessages = this.chatMessages.slice(-100);
         }
         this.$nextTick(() => {
-          // 모바일 채팅과 사이드바 채팅 모두 스크롤
-          const containers = [this.$refs.chatContainer, this.$refs.sidebarChatContainer];
-          containers.forEach(container => {
-            if (container) {
-              container.scrollTop = container.scrollHeight;
-            }
+          // 모든 채팅 컨테이너 스크롤 (partial에서 chatContainerRef 사용)
+          document.querySelectorAll('[x-ref="chatContainerRef"]').forEach(container => {
+            container.scrollTop = container.scrollHeight;
           });
         });
       });

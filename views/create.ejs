@@ -1,4 +1,9 @@
-<%- include('layout', { body: `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <%- include('partials/head') %>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
 <div class="container mx-auto px-4 py-8 max-w-lg">
   <a href="/" class="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
     <- 로비로 돌아가기
@@ -121,4 +126,6 @@ function createRoomForm() {
   }
 }
 </script>
-` }) %>
+<%- include('partials/scripts') %>
+</body>
+</html>

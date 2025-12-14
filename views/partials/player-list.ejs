@@ -1,0 +1,25 @@
+<div class="bg-gray-800 rounded-xl p-4">
+  <h3 class="font-semibold mb-3 flex items-center gap-2 text-sm">
+    <i data-lucide="users" class="w-4 h-4"></i>
+    플레이어 (<span x-text="room.players?.length || 0"></span>/<span x-text="room.maxPlayers || 8"></span>)
+  </h3>
+  <div class="space-y-2">
+    <template x-for="player in room.players" :key="player.id">
+      <div class="flex items-center gap-2 p-2 rounded-lg"
+        :class="player.isConnected ? 'bg-gray-700' : 'bg-gray-700/50 opacity-50'">
+        <i x-show="player.isHost" data-lucide="crown" class="w-4 h-4 text-yellow-400 flex-shrink-0"></i>
+        <i x-show="!player.isHost" data-lucide="user" class="w-4 h-4 flex-shrink-0"></i>
+        <span class="font-medium truncate text-sm" x-text="player.nickname"></span>
+        <span x-show="player.id === playerId" class="text-xs text-primary ml-auto">(나)</span>
+        <button
+          x-show="isHost && player.id !== playerId && room.state === 'waiting'"
+          @click="kickPlayer(player.id)"
+          class="ml-auto p-1 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded"
+          title="강퇴"
+        >
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </template>
+  </div>
+</div>

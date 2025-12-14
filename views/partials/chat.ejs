@@ -1,0 +1,31 @@
+<div class="bg-gray-800 rounded-xl p-4 flex flex-col flex-1 min-h-0">
+  <h3 class="font-semibold mb-3 flex items-center gap-2 text-sm">
+    <i data-lucide="message-square" class="w-4 h-4"></i> 채팅
+  </h3>
+  <div class="flex-1 overflow-y-auto space-y-2 mb-3" x-ref="chatContainerRef">
+    <template x-for="msg in chatMessages" :key="msg.timestamp">
+      <div class="text-sm">
+        <span class="font-medium text-primary" x-text="msg.nickname + ':'"></span>
+        <span x-text="msg.message"></span>
+      </div>
+    </template>
+    <div x-show="chatMessages.length === 0" class="text-gray-500 text-sm text-center py-4">
+      아직 메시지가 없습니다
+    </div>
+  </div>
+  <!-- 변론 중에는 변론자만 입력 가능 -->
+  <form @submit.prevent="sendChat()" class="flex gap-2"
+    x-show="room.state !== 'defense' || defenderId === playerId">
+    <input
+      type="text"
+      x-model="chatInput"
+      placeholder="메시지"
+      maxlength="200"
+      class="flex-1 px-3 py-2 bg-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
+    >
+    <button type="submit" class="px-3 py-2 bg-primary rounded-lg text-sm">전송</button>
+  </form>
+  <div x-show="room.state === 'defense' && defenderId !== playerId" class="text-gray-500 text-xs text-center">
+    변론자만 채팅할 수 있습니다
+  </div>
+</div>
