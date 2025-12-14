@@ -17,7 +17,6 @@ export interface Player {
   id: string;
   nickname: string;
   isHost: boolean;
-  isConnected: boolean;
   hasCheckedWord: boolean;
   description: string | null;
   nominatedId: string | null;
@@ -52,6 +51,7 @@ export interface Room {
   descriptionTime: number;
   discussionTime: number;
   defenseTime: number;
+  liarGuessTime: number;
   category: string;
   players: Player[];
   state: RoomState;
@@ -84,9 +84,6 @@ export interface LobbyRoomInfo {
   state: RoomState;
 }
 
-// 게임 결과
-export type GameResult = 'citizen-win' | 'liar-win' | 'liar-reverse-win';
-
 // 클라이언트에 전송할 방 정보 (민감한 정보 제외)
 export interface RoomInfoForClient {
   id: string;
@@ -98,6 +95,7 @@ export interface RoomInfoForClient {
   descriptionTime: number;
   discussionTime: number;
   defenseTime: number;
+  liarGuessTime: number;
   category: string;
   players: Player[];
   state: RoomState;

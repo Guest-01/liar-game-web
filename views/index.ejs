@@ -1,5 +1,5 @@
 <%- include('layout', { body: `
-<div x-data="{ showHelp: false }" class="container mx-auto px-4 py-8 max-w-6xl">
+<div x-data="lobbyPage()" x-init="init()" class="container mx-auto px-4 py-8 max-w-6xl">
   <!-- 헤더 (모바일에서만 표시) -->
   <header class="text-center mb-8 lg:hidden">
     <h1 class="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2 flex items-center justify-center gap-3">
@@ -66,6 +66,15 @@
         </h1>
         <p class="text-gray-400">누가 라이어인지 찾아내세요!</p>
       </header>
+
+      <!-- 에러 메시지 -->
+      <div x-show="errorMessage" x-cloak class="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-xl text-red-200 flex items-center gap-2">
+        <i data-lucide="alert-circle" class="w-5 h-5 flex-shrink-0"></i>
+        <span x-text="errorMessage"></span>
+        <button @click="errorMessage = ''" class="ml-auto p-1 hover:bg-red-800 rounded">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
 
       <!-- 닉네임 카드 -->
       <div x-data="nicknameCard()" class="bg-gray-800 rounded-xl p-4 border border-gray-700">
@@ -250,6 +259,24 @@
 </div>
 
 <script>
+function lobbyPage() {
+  return {
+    showHelp: false,
+    errorMessage: '',
+
+    init() {
+      // URL에서 에러 파라미터 확인
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get('error');
+      if (error === 'room-not-found') {
+        this.errorMessage = '방을 찾을 수 없습니다.';
+        // URL에서 에러 파라미터 제거
+        window.history.replaceState({}, '', '/');
+      }
+    }
+  }
+}
+
 function nicknameCard() {
   return {
     nickname: localStorage.getItem('nickname') || (typeof generateRandomNickname === 'function' ? generateRandomNickname() : ''),
@@ -332,7 +359,7 @@ function lobbyData() {
         this.rooms = data.rooms;
         this.$nextTick(() => lucide.createIcons());
       } catch (e) {
-        console.error('Failed to fetch rooms:', e);
+        // 방 목록 로딩 실패 시 무시 (10초마다 재시도함)
       }
       this.loading = false;
     },

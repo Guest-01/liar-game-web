@@ -220,8 +220,6 @@ function createRoomForm() {
       });
 
       socket.on('room-created', (data) => {
-        // 세션에 소켓 ID 저장 후 리다이렉트
-        sessionStorage.setItem('socketId', socket.id);
         window.location.href = '/room/' + data.roomId + '?nickname=' + encodeURIComponent(this.nickname);
       });
 

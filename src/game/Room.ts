@@ -74,7 +74,6 @@ export class GameRoom implements Room {
       id,
       nickname,
       isHost: shouldBeHost,
-      isConnected: true,
       hasCheckedWord: false,
       description: null,
       nominatedId: null
@@ -105,15 +104,6 @@ export class GameRoom implements Room {
 
     this.updateActivity();
     return true;
-  }
-
-  // 플레이어 연결 상태 업데이트
-  setPlayerConnected(id: string, connected: boolean): void {
-    const player = this.players.find(p => p.id === id);
-    if (player) {
-      player.isConnected = connected;
-      this.updateActivity();
-    }
   }
 
   // 게임 시작
@@ -441,6 +431,7 @@ export class GameRoom implements Room {
       descriptionTime: this.descriptionTime,
       discussionTime: this.discussionTime,
       defenseTime: this.defenseTime,
+      liarGuessTime: this.liarGuessTime,
       category: this.category,
       players: this.players,
       state: this.state

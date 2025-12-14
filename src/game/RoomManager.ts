@@ -1,6 +1,6 @@
 import { GameRoom } from './Room';
 import { GameMode, LobbyRoomInfo } from './types';
-import { generateRoomId } from '../utils/roomCode';
+import { generateRoomId } from '../utils/roomId';
 
 export class RoomManager {
   private rooms: Map<string, GameRoom> = new Map();
@@ -80,10 +80,9 @@ export class RoomManager {
       this.pendingDeletions.delete(roomId);
     }
 
-    // 재접속인지 확인
+    // 재접속인지 확인 (플레이어가 이미 방에 있는 경우)
     const existingPlayer = room.players.find(p => p.id === playerId);
     if (existingPlayer) {
-      room.setPlayerConnected(playerId, true);
       this.playerToRoom.set(playerId, roomId);
       return { room };
     }
@@ -180,14 +179,6 @@ export class RoomManager {
     }
 
     return cleaned;
-  }
-
-  // 통계
-  getStats(): { roomCount: number; playerCount: number } {
-    return {
-      roomCount: this.rooms.size,
-      playerCount: this.playerToRoom.size
-    };
   }
 }
 
