@@ -7,10 +7,16 @@ import { roomManager } from './game/RoomManager';
 import { getCategoryNames } from './data/words';
 import logger from './logger';
 
+// 버전 정보
+const { version } = require('../package.json');
+
 // 환경 변수 로드
 dotenv.config();
 
 const app = express();
+
+// 모든 뷰에서 사용할 수 있는 전역 변수
+app.locals.version = version;
 const httpServer = createServer(app);
 const io = createSocketServer(httpServer);
 
@@ -31,9 +37,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // 로비 (홈)
 app.get('/', (req, res) => {
-  const publicRooms = roomManager.getPublicRooms();
+  const lobbyRooms = roomManager.getLobbyRooms();
   const categories = getCategoryNames();
-  res.render('index', { publicRooms, categories });
+  res.render('index', { lobbyRooms, categories });
 });
 
 // 방 생성 페이지
@@ -42,42 +48,37 @@ app.get('/create', (req, res) => {
   res.render('create', { categories });
 });
 
-// 방 참가 페이지 (코드 입력)
-app.get('/join', (req, res) => {
-  const code = req.query.code || '';
-  res.render('join', { code });
-});
-
 // 게임 방
-app.get('/room/:code', (req, res) => {
-  const { code } = req.params;
-  const room = roomManager.getRoom(code);
+app.get('/room/:id', (req, res) => {
+  const { id } = req.params;
+  const room = roomManager.getRoom(id);
 
   if (!room) {
     return res.redirect('/?error=room-not-found');
   }
 
   res.render('room', {
-    roomCode: code,
+    roomId: id,
     room: room.getInfoForClient()
   });
 });
 
-// API: 공개 방 목록
+// API: 로비 방 목록
 app.get('/api/rooms', (req, res) => {
-  const rooms = roomManager.getPublicRooms();
+  const rooms = roomManager.getLobbyRooms();
   res.json({ rooms });
 });
 
-// API: 방 존재 여부 확인
-app.get('/api/rooms/:code', (req, res) => {
-  const room = roomManager.getRoom(req.params.code);
+// API: 방 정보 확인
+app.get('/api/rooms/:id', (req, res) => {
+  const room = roomManager.getRoom(req.params.id);
   if (!room) {
     return res.status(404).json({ error: 'Room not found' });
   }
   res.json({
     exists: true,
-    canJoin: room.state === 'waiting' && room.players.length < room.maxPlayers
+    canJoin: room.state === 'waiting' && room.players.length < room.maxPlayers,
+    isPublic: room.isPublic
   });
 });
 

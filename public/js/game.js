@@ -13,8 +13,6 @@ function gameRoom() {
 
     // 방 정보
     room: window.INITIAL_ROOM || {},
-    shareLink: window.location.href,
-    showCode: false,
 
     // 게임 상태
     myWord: { word: null, isLiar: false },
@@ -115,8 +113,8 @@ function gameRoom() {
         this.joined = true;
         this.error = '';
 
-        // URL 정리
-        window.history.replaceState({}, '', '/room/' + this.room.code);
+        // URL 정리 (비밀번호 파라미터 제거)
+        window.history.replaceState({}, '', '/room/' + this.room.id);
       });
 
       // 플레이어 참가
@@ -361,9 +359,15 @@ function gameRoom() {
       }
 
       localStorage.setItem('nickname', this.nickname);
+
+      // URL에서 비밀번호 파라미터 확인
+      const urlParams = new URLSearchParams(window.location.search);
+      const password = urlParams.get('password') || undefined;
+
       this.socket.emit('join-room', {
-        roomCode: window.ROOM_CODE,
-        nickname: this.nickname
+        roomId: window.ROOM_ID,
+        nickname: this.nickname,
+        password
       });
     },
 
@@ -501,18 +505,6 @@ function gameRoom() {
     // 지목 받은 수
     getNominationCount(playerId) {
       return Object.values(this.nominations).filter(id => id === playerId).length;
-    },
-
-    // 코드 복사
-    copyCode() {
-      copyToClipboard(this.room.code);
-      showToast('방 코드가 복사되었습니다!', 'success');
-    },
-
-    // 링크 복사
-    copyLink() {
-      copyToClipboard(this.shareLink);
-      showToast('초대 링크가 복사되었습니다!', 'success');
     }
   };
 }

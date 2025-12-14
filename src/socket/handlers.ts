@@ -12,10 +12,10 @@ export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
     logger.debug({ socketId: socket.id }, '클라이언트 연결');
 
-    // 공개 방 목록 요청
-    socket.on('get-public-rooms', () => {
-      const rooms = roomManager.getPublicRooms();
-      socket.emit('public-rooms', { rooms });
+    // 로비 방 목록 요청
+    socket.on('get-lobby-rooms', () => {
+      const rooms = roomManager.getLobbyRooms();
+      socket.emit('lobby-rooms', { rooms });
     });
 
     // 방 생성
@@ -23,6 +23,7 @@ export function setupSocketHandlers(io: Server): void {
       nickname: string;
       roomName: string;
       isPublic: boolean;
+      password?: string;
       maxPlayers: number;
       gameMode: GameMode;
       descriptionTime: number;
@@ -33,6 +34,7 @@ export function setupSocketHandlers(io: Server): void {
       // XSS 방지
       const nickname = sanitizeInput(data.nickname, 10);
       const roomName = sanitizeInput(data.roomName, 20);
+      const password = data.password ? sanitizeInput(data.password, 20) : null;
       const { isPublic, maxPlayers, gameMode, descriptionTime, discussionTime, defenseTime, category } = data;
 
       // 유효성 검사
@@ -44,9 +46,15 @@ export function setupSocketHandlers(io: Server): void {
         socket.emit('error', { message: '방 이름은 1-20자 사이여야 합니다.' });
         return;
       }
+      // 비공개 방 비밀번호 필수
+      if (!isPublic && !password) {
+        socket.emit('error', { message: '비공개 방은 비밀번호가 필요합니다.' });
+        return;
+      }
 
       const room = roomManager.createRoom(socket.id, nickname, roomName, {
         isPublic: isPublic === true,
+        password,
         maxPlayers: Math.min(8, Math.max(3, maxPlayers)),
         gameMode,
         descriptionTime: Math.min(60, Math.max(10, descriptionTime)),
@@ -60,19 +68,19 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
-      socket.join(room.code);
-      socket.emit('room-created', { roomCode: room.code });
+      socket.join(room.id);
+      socket.emit('room-created', { roomId: room.id });
       socket.emit('room-joined', {
         room: room.getInfoForClient(),
         playerId: socket.id
       });
 
-      logger.info({ roomCode: room.code, nickname, roomName }, `방 생성 | ${room.code} | ${nickname} | ${roomName}`);
+      logger.info({ roomId: room.id, nickname, roomName }, `방 생성 | ${room.id} | ${nickname} | ${roomName}`);
     });
 
     // 방 참가
-    socket.on('join-room', (data: { roomCode: string; nickname: string }) => {
-      const { roomCode } = data;
+    socket.on('join-room', (data: { roomId: string; nickname: string; password?: string }) => {
+      const { roomId, password } = data;
       // XSS 방지
       const nickname = sanitizeInput(data.nickname, 10);
 
@@ -81,25 +89,26 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
-      const room = roomManager.joinRoom(roomCode, socket.id, nickname);
-      if (!room) {
-        // 구체적인 에러 메시지를 위해 방을 먼저 조회
-        const existingRoom = roomManager.getRoom(roomCode);
-        if (!existingRoom) {
-          socket.emit('error', { message: '방이 존재하지 않습니다.' });
-        } else if (existingRoom.state !== 'waiting') {
-          socket.emit('error', { message: '게임이 진행 중입니다.' });
-        } else if (existingRoom.players.find(p => p.nickname === nickname)) {
-          socket.emit('error', { message: '이미 같은 닉네임이 사용 중입니다.' });
-        } else if (existingRoom.players.length >= existingRoom.maxPlayers) {
-          socket.emit('error', { message: '방이 가득 찼습니다.' });
-        } else {
-          socket.emit('error', { message: '방에 참가할 수 없습니다.' });
-        }
+      const result = roomManager.joinRoom(roomId, socket.id, nickname, password);
+      if (!result.room) {
+        const errorMessages: Record<string, string> = {
+          'room-not-found': '방이 존재하지 않습니다.',
+          'already-in-room': '이미 다른 방에 있습니다.',
+          'game-in-progress': '게임이 진행 중입니다.',
+          'invalid-password': '비밀번호가 틀렸습니다.',
+          'duplicate-nickname': '이미 같은 닉네임이 사용 중입니다.',
+          'room-full': '방이 가득 찼습니다.',
+          'join-failed': '방에 참가할 수 없습니다.'
+        };
+        socket.emit('error', {
+          message: errorMessages[result.error || ''] || '방에 참가할 수 없습니다.',
+          errorCode: result.error
+        });
         return;
       }
 
-      socket.join(room.code);
+      const room = result.room;
+      socket.join(room.id);
       socket.emit('room-joined', {
         room: room.getInfoForClient(),
         playerId: socket.id
@@ -107,9 +116,9 @@ export function setupSocketHandlers(io: Server): void {
 
       // 다른 플레이어들에게 알림
       const player = room.players.find(p => p.id === socket.id);
-      socket.to(room.code).emit('player-joined', { player });
+      socket.to(room.id).emit('player-joined', { player });
 
-      logger.info({ roomCode, nickname }, `방 참가 | ${roomCode} | ${nickname}`);
+      logger.info({ roomId, nickname }, `방 참가 | ${roomId} | ${nickname}`);
     });
 
     // 방 나가기
@@ -150,7 +159,7 @@ export function setupSocketHandlers(io: Server): void {
       io.to(data.targetId).emit('kicked', { message: '방에서 강퇴되었습니다.' });
 
       // 다른 플레이어들에게 알림
-      socket.to(room.code).emit('player-kicked', {
+      socket.to(room.id).emit('player-kicked', {
         playerId: data.targetId,
         nickname
       });
@@ -187,7 +196,7 @@ export function setupSocketHandlers(io: Server): void {
         });
       }
 
-      logger.info({ roomCode: room.code, playerCount: room.players.length }, `게임 시작 | ${room.code} | ${room.players.length}명`);
+      logger.info({ roomId: room.id, playerCount: room.players.length }, `게임 시작 | ${room.id} | ${room.players.length}명`);
     });
 
     // 단어 확인 완료
@@ -201,14 +210,14 @@ export function setupSocketHandlers(io: Server): void {
         // 한줄 설명 단계 시작 (상태 변경은 클라이언트에서 처리)
         const currentDescriberId = room.getCurrentDescriberId();
         const endTime = Date.now() + room.descriptionTime * 1000;
-        io.to(room.code).emit('description-phase-start', {
+        io.to(room.id).emit('description-phase-start', {
           currentDescriberId,
           endTime,
           order: room.game?.descriptionOrder
         });
       } else {
         // 아직 전원 확인 안 됐을 때만 상태 업데이트
-        io.to(room.code).emit('room-state-update', { state: room.state, players: room.players });
+        io.to(room.id).emit('room-state-update', { state: room.state, players: room.players });
       }
     });
 
@@ -226,7 +235,7 @@ export function setupSocketHandlers(io: Server): void {
       }
 
       // 설명 제출됨 브로드캐스트
-      io.to(room.code).emit('description-submitted', {
+      io.to(room.id).emit('description-submitted', {
         playerId: socket.id,
         description
       });
@@ -234,7 +243,7 @@ export function setupSocketHandlers(io: Server): void {
       // 모든 설명이 끝났는지 확인
       if (room.state === 'discussion') {
         // 토론 단계 시작
-        io.to(room.code).emit('discussion-start', {
+        io.to(room.id).emit('discussion-start', {
           descriptions: room.game.descriptions,
           endTime: room.game.discussionEndTime
         });
@@ -242,7 +251,7 @@ export function setupSocketHandlers(io: Server): void {
         // 다음 설명자 차례
         const nextDescriberId = room.getCurrentDescriberId();
         const endTime = Date.now() + room.descriptionTime * 1000;
-        io.to(room.code).emit('description-turn', {
+        io.to(room.id).emit('description-turn', {
           currentDescriberId: nextDescriberId,
           endTime
         });
@@ -266,7 +275,7 @@ export function setupSocketHandlers(io: Server): void {
       const message = sanitizeInput(data.message, 200);
       if (!message) return;
 
-      io.to(room.code).emit('chat-message', {
+      io.to(room.id).emit('chat-message', {
         playerId: socket.id,
         nickname: player.nickname,
         message,
@@ -284,7 +293,7 @@ export function setupSocketHandlers(io: Server): void {
       }
 
       // 지목 현황 브로드캐스트
-      io.to(room.code).emit('nomination-update', {
+      io.to(room.id).emit('nomination-update', {
         nominations: room.game.nominations
       });
 
@@ -293,7 +302,7 @@ export function setupSocketHandlers(io: Server): void {
         // 5초 후 토론 종료
         const newEndTime = Math.min(room.game.discussionEndTime, Date.now() + 5000);
         room.game.discussionEndTime = newEndTime;
-        io.to(room.code).emit('all-nominated', { endTime: newEndTime });
+        io.to(room.id).emit('all-nominated', { endTime: newEndTime });
       }
     });
 
@@ -310,14 +319,14 @@ export function setupSocketHandlers(io: Server): void {
       if (result.isTie) {
         // 동점 - 재토론
         room.restartDiscussion();
-        io.to(room.code).emit('tie-detected', {
+        io.to(room.id).emit('tie-detected', {
           tiedPlayerIds: result.tiedPlayerIds,
           endTime: room.game.discussionEndTime
         });
       } else if (result.winnerId) {
         // 최후 변론 시작
         room.startDefense(result.winnerId);
-        io.to(room.code).emit('defense-start', {
+        io.to(room.id).emit('defense-start', {
           defenderId: result.winnerId,
           endTime: room.game.defenseEndTime
         });
@@ -332,7 +341,7 @@ export function setupSocketHandlers(io: Server): void {
       if (room.hostId !== socket.id) return;
 
       room.startFinalVote();
-      io.to(room.code).emit('final-vote-start', {
+      io.to(room.id).emit('final-vote-start', {
         defenderId: room.game.nominatedPlayerId
       });
     });
@@ -348,7 +357,7 @@ export function setupSocketHandlers(io: Server): void {
 
       // 투표 현황 (개수만)
       const currentResult = room.calculateFinalVoteResult();
-      io.to(room.code).emit('final-vote-update', {
+      io.to(room.id).emit('final-vote-update', {
         votedCount: Object.keys(room.game.finalVotes).length,
         totalVoters: room.players.length - 1
       });
@@ -356,12 +365,12 @@ export function setupSocketHandlers(io: Server): void {
       // 모두 투표했는지 확인
       if (room.allFinalVoted()) {
         const result = room.calculateFinalVoteResult();
-        const roomCode = room.code;
+        const roomId = room.id;
         const nominatedPlayerId = room.game.nominatedPlayerId;
         const liarId = room.game.liarId;
 
         // 결과 브로드캐스트 (찬성/반대 표 수 공개)
-        io.to(roomCode).emit('final-vote-result', {
+        io.to(roomId).emit('final-vote-result', {
           agree: result.agree,
           disagree: result.disagree,
           confirmed: result.confirmed,
@@ -371,7 +380,7 @@ export function setupSocketHandlers(io: Server): void {
         // 5초 후 다음 단계로 진행
         setTimeout(() => {
           // 방이 아직 유효한지 확인
-          const currentRoom = roomManager.getRoom(roomCode);
+          const currentRoom = roomManager.getRoom(roomId);
           if (!currentRoom || !currentRoom.game) return;
 
           if (result.confirmed) {
@@ -381,7 +390,7 @@ export function setupSocketHandlers(io: Server): void {
             if (isLiar) {
               // 라이어 정답 맞추기 단계
               currentRoom.startLiarGuess();
-              io.to(roomCode).emit('liar-guess-phase', {
+              io.to(roomId).emit('liar-guess-phase', {
                 liarId: currentRoom.game.liarId,
                 endTime: currentRoom.game.liarGuessEndTime
               });
@@ -390,14 +399,14 @@ export function setupSocketHandlers(io: Server): void {
               currentRoom.goToResult();
               const gameResult = currentRoom.getGameResult();
               if (gameResult) {
-                io.to(roomCode).emit('game-end', gameResult);
-                logger.info({ roomCode, winner: gameResult.winner }, `게임 종료 | ${roomCode} | 승자: ${gameResult.winner}`);
+                io.to(roomId).emit('game-end', gameResult);
+                logger.info({ roomId, winner: gameResult.winner }, `게임 종료 | ${roomId} | 승자: ${gameResult.winner}`);
               }
             }
           } else {
             // 과반수 미달 - 토론 단계로 복귀
             currentRoom.restartDiscussion();
-            io.to(roomCode).emit('restart-discussion', {
+            io.to(roomId).emit('restart-discussion', {
               reason: 'vote-failed',
               discussionEndTime: currentRoom.game.discussionEndTime
             });
@@ -419,8 +428,8 @@ export function setupSocketHandlers(io: Server): void {
       room.submitLiarGuess(sanitizedWord);
       const gameResult = room.getGameResult();
       if (gameResult) {
-        io.to(room.code).emit('game-end', gameResult);
-        logger.info({ roomCode: room.code, winner: gameResult.winner }, `게임 종료 | ${room.code} | 승자: ${gameResult.winner}`);
+        io.to(room.id).emit('game-end', gameResult);
+        logger.info({ roomId: room.id, winner: gameResult.winner }, `게임 종료 | ${room.id} | 승자: ${gameResult.winner}`);
       }
     });
 
@@ -436,8 +445,8 @@ export function setupSocketHandlers(io: Server): void {
       room.submitLiarGuess('');
       const gameResult = room.getGameResult();
       if (gameResult) {
-        io.to(room.code).emit('game-end', gameResult);
-        logger.info({ roomCode: room.code, winner: gameResult.winner }, `게임 종료 | ${room.code} | 승자: ${gameResult.winner}`);
+        io.to(room.id).emit('game-end', gameResult);
+        logger.info({ roomId: room.id, winner: gameResult.winner }, `게임 종료 | ${room.id} | 승자: ${gameResult.winner}`);
       }
     });
 
@@ -452,7 +461,7 @@ export function setupSocketHandlers(io: Server): void {
       }
 
       room.resetGame();
-      io.to(room.code).emit('game-reset', {
+      io.to(room.id).emit('game-reset', {
         room: room.getInfoForClient()
       });
     });
@@ -471,16 +480,16 @@ function handleLeaveRoom(socket: Socket, io: Server): void {
   const wasInGame = roomBeforeLeave && roomBeforeLeave.state !== 'waiting';
   const wasLiar = roomBeforeLeave?.game?.liarId === socket.id;
   const wasDefender = roomBeforeLeave?.game?.nominatedPlayerId === socket.id;
-  const roomCodeBeforeLeave = roomBeforeLeave?.code;
+  const roomIdBeforeLeave = roomBeforeLeave?.id;
 
   const { room, deleted } = roomManager.leaveRoom(socket.id);
 
-  if (deleted && roomCodeBeforeLeave) {
-    logger.info({ roomCode: roomCodeBeforeLeave }, `방 삭제 | ${roomCodeBeforeLeave}`);
+  if (deleted && roomIdBeforeLeave) {
+    logger.info({ roomId: roomIdBeforeLeave }, `방 삭제 | ${roomIdBeforeLeave}`);
   }
 
   if (room && !deleted) {
-    socket.to(room.code).emit('player-left', {
+    socket.to(room.id).emit('player-left', {
       playerId: socket.id,
       newHostId: room.hostId
     });
@@ -490,7 +499,7 @@ function handleLeaveRoom(socket: Socket, io: Server): void {
       // 3명 미만이면 게임 강제 종료
       if (room.players.length < 3) {
         room.resetGame();
-        io.to(room.code).emit('game-interrupted', {
+        io.to(room.id).emit('game-interrupted', {
           reason: '플레이어가 나가서 게임을 계속할 수 없습니다.',
           room: room.getInfoForClient()
         });
@@ -498,7 +507,7 @@ function handleLeaveRoom(socket: Socket, io: Server): void {
       // 라이어가 나간 경우 → 시민 승리
       else if (wasLiar) {
         room.goToResult();
-        io.to(room.code).emit('game-end', {
+        io.to(room.id).emit('game-end', {
           winner: 'citizen',
           liarId: socket.id,
           citizenWord: room.game.citizenWord,
@@ -509,12 +518,12 @@ function handleLeaveRoom(socket: Socket, io: Server): void {
           liarGuess: null,
           reason: '라이어가 게임을 나갔습니다.'
         });
-        logger.info({ roomCode: room.code, winner: 'citizen', reason: 'liar-left' }, `게임 종료 | ${room.code} | 승자: citizen (라이어 이탈)`);
+        logger.info({ roomId: room.id, winner: 'citizen', reason: 'liar-left' }, `게임 종료 | ${room.id} | 승자: citizen (라이어 이탈)`);
       }
       // 변론자/지목된 사람이 나간 경우 → 토론 재시작
       else if (wasDefender && (room.state === 'defense' || room.state === 'final-vote')) {
         room.restartDiscussion();
-        io.to(room.code).emit('restart-discussion', {
+        io.to(room.id).emit('restart-discussion', {
           reason: 'defender-left',
           discussionEndTime: room.game.discussionEndTime
         });
@@ -522,5 +531,5 @@ function handleLeaveRoom(socket: Socket, io: Server): void {
     }
   }
 
-  socket.leave(room?.code || '');
+  socket.leave(room?.id || '');
 }

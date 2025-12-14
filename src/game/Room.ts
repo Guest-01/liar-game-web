@@ -1,11 +1,12 @@
-import { Room, Player, Game, RoomState, GameMode, PublicRoomInfo, RoomInfoForClient } from './types';
+import { Room, Player, Game, RoomState, GameMode, LobbyRoomInfo, RoomInfoForClient } from './types';
 import { getRandomWordPair } from '../data/words';
 
 export class GameRoom implements Room {
-  code: string;
+  id: string;
   name: string;
   hostId: string;
   isPublic: boolean;
+  password: string | null;
   maxPlayers: number;
   gameMode: GameMode;
   descriptionTime: number;
@@ -20,11 +21,12 @@ export class GameRoom implements Room {
   lastActivity: number;
 
   constructor(
-    code: string,
+    id: string,
     name: string,
     hostId: string,
     options: {
       isPublic?: boolean;
+      password?: string | null;
       maxPlayers?: number;
       gameMode?: GameMode;
       descriptionTime?: number;
@@ -33,10 +35,11 @@ export class GameRoom implements Room {
       category?: string;
     } = {}
   ) {
-    this.code = code;
+    this.id = id;
     this.name = name;
     this.hostId = hostId;
     this.isPublic = options.isPublic ?? true;
+    this.password = this.isPublic ? null : (options.password ?? null);
     this.maxPlayers = options.maxPlayers ?? 8;
     this.gameMode = options.gameMode ?? 'normal';
     this.descriptionTime = options.descriptionTime ?? 15;
@@ -412,11 +415,12 @@ export class GameRoom implements Room {
     this.lastActivity = Date.now();
   }
 
-  // 공개 방 정보 (로비용)
-  getPublicInfo(): PublicRoomInfo {
+  // 로비용 방 정보
+  getLobbyInfo(): LobbyRoomInfo {
     return {
-      code: this.code,
+      id: this.id,
       name: this.name,
+      isPublic: this.isPublic,
       playerCount: this.players.length,
       maxPlayers: this.maxPlayers,
       gameMode: this.gameMode,
@@ -428,7 +432,7 @@ export class GameRoom implements Room {
   // 클라이언트용 방 정보 (민감 정보 제외)
   getInfoForClient(): RoomInfoForClient {
     return {
-      code: this.code,
+      id: this.id,
       name: this.name,
       hostId: this.hostId,
       isPublic: this.isPublic,

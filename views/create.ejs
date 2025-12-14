@@ -39,19 +39,32 @@
       <div>
         <label class="block text-sm font-medium text-gray-300 mb-2">공개 설정</label>
         <div class="flex gap-4">
-          <label class="flex-1 cursor-pointer">
-            <input type="radio" x-model="isPublic" :value="true" class="sr-only peer">
-            <div class="p-4 bg-gray-700 rounded-lg text-center peer-checked:bg-primary peer-checked:ring-2 peer-checked:ring-primary/50 transition-all flex items-center justify-center gap-2">
+          <button type="button" @click="isPublic = true" class="flex-1">
+            <div class="p-4 bg-gray-700 rounded-lg text-center transition-all flex items-center justify-center gap-2" :class="isPublic && 'bg-primary ring-2 ring-primary/50'">
               <i data-lucide="globe" class="w-5 h-5"></i> 공개
             </div>
-          </label>
-          <label class="flex-1 cursor-pointer">
-            <input type="radio" x-model="isPublic" :value="false" class="sr-only peer">
-            <div class="p-4 bg-gray-700 rounded-lg text-center peer-checked:bg-primary peer-checked:ring-2 peer-checked:ring-primary/50 transition-all flex items-center justify-center gap-2">
+          </button>
+          <button type="button" @click="isPublic = false" class="flex-1">
+            <div class="p-4 bg-gray-700 rounded-lg text-center transition-all flex items-center justify-center gap-2" :class="!isPublic && 'bg-primary ring-2 ring-primary/50'">
               <i data-lucide="lock" class="w-5 h-5"></i> 비공개
             </div>
-          </label>
+          </button>
         </div>
+      </div>
+
+      <!-- 비밀번호 (비공개 방) -->
+      <div x-show="!isPublic" x-transition>
+        <label class="block text-sm font-medium text-gray-300 mb-2">비밀번호</label>
+        <input
+          type="password"
+          x-model="password"
+          placeholder="비밀번호를 입력하세요"
+          minlength="1"
+          maxlength="20"
+          :required="!isPublic"
+          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+        >
+        <p class="text-xs text-gray-500 mt-1">참가자가 방에 들어올 때 입력해야 합니다</p>
       </div>
 
       <!-- 게임 모드 -->
@@ -158,6 +171,7 @@ function createRoomForm() {
     nickname: localStorage.getItem('nickname') || generateRandomNickname(),
     roomName: '',
     isPublic: true,
+    password: '',
     gameMode: 'normal',
     maxPlayers: 6,
     category: '${categories[0]}',
@@ -176,6 +190,10 @@ function createRoomForm() {
         this.error = '방 이름을 입력하세요.';
         return;
       }
+      if (!this.isPublic && !this.password) {
+        this.error = '비공개 방은 비밀번호가 필요합니다.';
+        return;
+      }
 
       this.loading = true;
       this.error = '';
@@ -191,6 +209,7 @@ function createRoomForm() {
           nickname: this.nickname,
           roomName: this.roomName,
           isPublic: this.isPublic,
+          password: this.isPublic ? null : this.password,
           maxPlayers: parseInt(this.maxPlayers),
           gameMode: this.gameMode,
           descriptionTime: parseInt(this.descriptionTime),
@@ -203,7 +222,7 @@ function createRoomForm() {
       socket.on('room-created', (data) => {
         // 세션에 소켓 ID 저장 후 리다이렉트
         sessionStorage.setItem('socketId', socket.id);
-        window.location.href = '/room/' + data.roomCode + '?nickname=' + encodeURIComponent(this.nickname);
+        window.location.href = '/room/' + data.roomId + '?nickname=' + encodeURIComponent(this.nickname);
       });
 
       socket.on('error', (data) => {

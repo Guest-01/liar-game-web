@@ -42,10 +42,11 @@ export interface Game {
 
 // 방
 export interface Room {
-  code: string;
+  id: string;
   name: string;
   hostId: string;
   isPublic: boolean;
+  password: string | null;
   maxPlayers: number;
   gameMode: GameMode;
   descriptionTime: number;
@@ -71,10 +72,11 @@ export interface WordCategory {
   pairs: WordPair[];
 }
 
-// 공개 방 정보 (로비용)
-export interface PublicRoomInfo {
-  code: string;
+// 로비 방 정보
+export interface LobbyRoomInfo {
+  id: string;
   name: string;
+  isPublic: boolean;
   playerCount: number;
   maxPlayers: number;
   gameMode: GameMode;
@@ -87,7 +89,7 @@ export type GameResult = 'citizen-win' | 'liar-win' | 'liar-reverse-win';
 
 // 클라이언트에 전송할 방 정보 (민감한 정보 제외)
 export interface RoomInfoForClient {
-  code: string;
+  id: string;
   name: string;
   hostId: string;
   isPublic: boolean;
