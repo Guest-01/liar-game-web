@@ -1,4 +1,4 @@
-import { Room, Player, Game, RoomState, GameMode, LobbyRoomInfo, RoomInfoForClient } from './types';
+import { Room, Player, Game, RoomState, GameMode, LobbyRoomInfo, RoomInfoForClient, REDO_DESCRIPTION_ID } from './types';
 import { getRandomWordPair, getCategoryNames } from '../data/words';
 
 export class GameRoom implements Room {
@@ -230,7 +230,8 @@ export class GameRoom implements Room {
   nominate(voterId: string, targetId: string): boolean {
     if (!this.game || this.state !== 'discussion') return false;
     if (voterId === targetId) return false;
-    if (!this.players.find(p => p.id === targetId)) return false;
+    // REDO_DESCRIPTION_ID 또는 유효한 플레이어만 지목 가능
+    if (targetId !== REDO_DESCRIPTION_ID && !this.players.find(p => p.id === targetId)) return false;
 
     const voter = this.players.find(p => p.id === voterId);
     if (!voter) return false;
@@ -290,6 +291,36 @@ export class GameRoom implements Room {
     this.state = 'discussion';
     this.game.discussionEndTime = Date.now() + this.discussionTime * 1000;
     this.updateActivity();
+  }
+
+  // 한줄 설명 단계로 재시작
+  restartDescriptionPhase(): void {
+    if (!this.game) return;
+
+    // 설명 및 지목 초기화
+    this.players.forEach(p => {
+      p.description = null;
+      p.nominatedId = null;
+    });
+    this.game.descriptions = {};
+    this.game.nominations = {};
+
+    // 순서 재설정 (새로 랜덤)
+    const newOrder = this.players.map(p => p.id);
+    for (let i = newOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newOrder[i], newOrder[j]] = [newOrder[j], newOrder[i]];
+    }
+    this.game.descriptionOrder = newOrder;
+    this.game.currentDescriberIndex = 0;
+
+    this.state = 'description';
+    this.updateActivity();
+  }
+
+  // 한줄 설명 단계 시작 시간 가져오기 (첫 번째 설명자 타이머용)
+  getDescriptionEndTime(): number {
+    return Date.now() + this.descriptionTime * 1000;
   }
 
   // 최종 투표 시작

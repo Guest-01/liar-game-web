@@ -1,3 +1,6 @@
+// 특수 ID: 한줄 설명 다시하기
+export const REDO_DESCRIPTION_ID = '__REDO_DESCRIPTION__';
+
 // 게임 모드
 export type GameMode = 'normal' | 'fool';
 

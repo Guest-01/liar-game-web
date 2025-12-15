@@ -352,7 +352,7 @@
               <template x-for="player in room.players" :key="player.id">
                 <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
                   <div class="min-w-0 flex-1 mr-2">
-                    <span class="font-medium" x-text="player.nickname"></span>:
+                    <span class="font-medium" x-text="player.nickname"></span><span x-show="player.id === playerId" class="text-primary text-sm">(나)</span>:
                     <span class="text-gray-300" x-text="descriptions[player.id] || '...'"></span>
                   </div>
                   <div class="flex items-center gap-2 flex-shrink-0">
@@ -369,6 +369,25 @@
                   </div>
                 </div>
               </template>
+
+              <!-- 한줄 설명 다시하기 선택지 -->
+              <div class="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-dashed border-yellow-600/50">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="refresh-cw" class="w-5 h-5 text-yellow-400"></i>
+                  <span class="font-medium text-yellow-400">한줄 설명 다시하기</span>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <span class="text-xs text-gray-400" x-text="getNominationCount(REDO_DESCRIPTION_ID) + '표'"></span>
+                  <button
+                    @click="nominate(REDO_DESCRIPTION_ID)"
+                    class="px-3 py-1 rounded-lg text-sm transition-colors"
+                    :class="myNomination === REDO_DESCRIPTION_ID ? 'bg-yellow-600' : 'bg-gray-600 hover:bg-gray-500'"
+                  >
+                    <span x-show="myNomination === REDO_DESCRIPTION_ID" class="flex items-center gap-1"><i data-lucide="hand" class="w-4 h-4"></i> 지목함</span>
+                    <span x-show="myNomination !== REDO_DESCRIPTION_ID">지목</span>
+                  </button>
+                </div>
+              </div>
             </div>
             <p class="text-xs text-gray-500 text-center mt-2 flex items-center justify-center gap-1">
               <i data-lucide="info" class="w-3 h-3"></i>

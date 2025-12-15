@@ -1,3 +1,6 @@
+// 특수 ID: 한줄 설명 다시하기
+const REDO_DESCRIPTION_ID = '__REDO_DESCRIPTION__';
+
 // 게임 방 Alpine.js 컴포넌트
 function gameRoom() {
   return {
@@ -196,6 +199,14 @@ function gameRoom() {
         this.myDescriptionSubmitted = false;
         this.checkedCount = this.room.players.length;  // 전원 확인 완료 상태
         this.shuffleEndTime = data.endTime;
+
+        // 기존 데이터 초기화 (한줄 설명 다시하기 시)
+        this.descriptions = {};
+        this.nominations = {};
+        this.myNomination = null;
+
+        // 애니메이션 중 토론 UI 숨기기
+        this.room.state = 'word-check';
 
         // 순서 결정 애니메이션 시작
         this.shuffleAnimation = true;

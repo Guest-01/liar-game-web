@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { roomManager } from '../game/RoomManager';
-import { GameMode } from '../game/types';
+import { GameMode, REDO_DESCRIPTION_ID } from '../game/types';
 import logger from '../logger';
 
 // XSS 방지 - 위험한 문자 제거
@@ -380,7 +380,30 @@ export function setupSocketHandlers(io: Server): void {
       // 호스트만 처리
       if (room.hostId !== socket.id) return;
 
+      const nominationCount = Object.keys(room.game.nominations).length;
       const result = room.calculateNominationResult();
+
+      // 아무도 투표하지 않음 → 설명 단계로
+      if (nominationCount === 0) {
+        room.restartDescriptionPhase();
+        io.to(room.id).emit('description-phase-start', {
+          order: room.game.descriptionOrder,
+          endTime: room.getDescriptionEndTime(),
+          reason: 'no-votes'
+        });
+        return;
+      }
+
+      // "한줄 설명 다시하기"가 당선됨
+      if (result.winnerId === REDO_DESCRIPTION_ID) {
+        room.restartDescriptionPhase();
+        io.to(room.id).emit('description-phase-start', {
+          order: room.game.descriptionOrder,
+          endTime: room.getDescriptionEndTime(),
+          reason: 'redo-voted'
+        });
+        return;
+      }
 
       if (result.isTie) {
         // 동점 - 재토론
