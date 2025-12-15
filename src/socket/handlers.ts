@@ -409,7 +409,23 @@ export function setupSocketHandlers(io: Server): void {
 
       room.startFinalVote();
       io.to(room.id).emit('final-vote-start', {
-        defenderId: room.game.nominatedPlayerId
+        defenderId: room.game.nominatedPlayerId,
+        endTime: room.game.finalVoteEndTime
+      });
+    });
+
+    // 최후 변론 타임아웃 (호스트가 타이머 종료 시 호출)
+    socket.on('defense-timeout', () => {
+      const room = roomManager.getRoomByPlayerId(socket.id);
+      if (!room || !room.game || room.state !== 'defense') return;
+
+      // 호스트만 타임아웃 처리 가능
+      if (room.hostId !== socket.id) return;
+
+      room.startFinalVote();
+      io.to(room.id).emit('final-vote-start', {
+        defenderId: room.game.nominatedPlayerId,
+        endTime: room.game.finalVoteEndTime
       });
     });
 
@@ -436,10 +452,11 @@ export function setupSocketHandlers(io: Server): void {
         const nominatedPlayerId = room.game.nominatedPlayerId;
         const liarId = room.game.liarId;
 
-        // 결과 브로드캐스트 (찬성/반대 표 수 공개)
+        // 결과 브로드캐스트 (찬성/반대/무효 표 수 공개)
         io.to(roomId).emit('final-vote-result', {
           agree: result.agree,
           disagree: result.disagree,
+          abstain: result.abstain,
           confirmed: result.confirmed,
           nominatedPlayerId
         });
@@ -480,6 +497,65 @@ export function setupSocketHandlers(io: Server): void {
           }
         }, 5000);
       }
+    });
+
+    // 최종 투표 타이머 종료 (호스트가 호출)
+    socket.on('final-vote-timeout', () => {
+      const room = roomManager.getRoomByPlayerId(socket.id);
+      if (!room || !room.game || room.state !== 'final-vote') return;
+
+      // 호스트만 처리
+      if (room.hostId !== socket.id) return;
+
+      const result = room.calculateFinalVoteResult();
+      const roomId = room.id;
+      const nominatedPlayerId = room.game.nominatedPlayerId;
+      const liarId = room.game.liarId;
+
+      // 결과 브로드캐스트 (찬성/반대/무효 표 수 공개)
+      io.to(roomId).emit('final-vote-result', {
+        agree: result.agree,
+        disagree: result.disagree,
+        abstain: result.abstain,
+        confirmed: result.confirmed,
+        nominatedPlayerId
+      });
+
+      // 5초 후 다음 단계로 진행
+      setTimeout(() => {
+        // 방이 아직 유효한지 확인
+        const currentRoom = roomManager.getRoom(roomId);
+        if (!currentRoom || !currentRoom.game) return;
+
+        if (result.confirmed) {
+          // 지목된 사람이 라이어인지 확인
+          const isLiar = nominatedPlayerId === liarId;
+
+          if (isLiar) {
+            // 라이어 정답 맞추기 단계
+            currentRoom.startLiarGuess();
+            io.to(roomId).emit('liar-guess-phase', {
+              liarId: currentRoom.game.liarId,
+              endTime: currentRoom.game.liarGuessEndTime
+            });
+          } else {
+            // 틀림 - 라이어 승리
+            currentRoom.goToResult();
+            const gameResult = currentRoom.getGameResult();
+            if (gameResult) {
+              io.to(roomId).emit('game-end', gameResult);
+              logger.info({ roomId, winner: gameResult.winner }, `게임 종료 | ${roomId} | 승자: ${gameResult.winner}`);
+            }
+          }
+        } else {
+          // 과반수 미달 - 토론 단계로 복귀
+          currentRoom.restartDiscussion();
+          io.to(roomId).emit('restart-discussion', {
+            reason: 'vote-failed',
+            discussionEndTime: currentRoom.game.discussionEndTime
+          });
+        }
+      }, 5000);
     });
 
     // 라이어 정답 맞추기

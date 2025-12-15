@@ -63,6 +63,11 @@ function gameRoom() {
     timerInterval: null,
     timerEndTime: 0,
 
+    // 순서 결정 애니메이션
+    shuffleAnimation: false,
+    shuffleHighlightIndex: 0,
+    shuffleEndTime: 0,
+
     // 계산된 속성
     get isHost() {
       return this.room.hostId === this.playerId;
@@ -186,12 +191,49 @@ function gameRoom() {
 
       // 한줄 설명 시작
       this.socket.on('description-phase-start', (data) => {
-        this.room.state = 'description';  // 상태 변경을 여기서 처리
         this.descriptionOrder = data.order;
         this.currentDescriberIndex = 0;
         this.myDescriptionSubmitted = false;
         this.checkedCount = this.room.players.length;  // 전원 확인 완료 상태
-        this.startTimer(data.endTime);
+        this.shuffleEndTime = data.endTime;
+
+        // 순서 결정 애니메이션 시작
+        this.shuffleAnimation = true;
+        this.shuffleHighlightIndex = 0;
+
+        let iterations = 0;
+        const totalIterations = 15 + Math.floor(Math.random() * 5); // 15~20회 순환
+        const baseDelay = 50; // 시작 속도 (ms)
+
+        const animate = () => {
+          this.shuffleHighlightIndex = (this.shuffleHighlightIndex + 1) % this.room.players.length;
+          iterations++;
+
+          if (iterations >= totalIterations) {
+            // 첫 번째 차례인 사람에서 멈춤
+            const firstPlayerId = this.descriptionOrder[0];
+            this.shuffleHighlightIndex = this.room.players.findIndex(p => p.id === firstPlayerId);
+
+            // 애니메이션 종료 후 실제 단계 시작
+            setTimeout(() => {
+              this.shuffleAnimation = false;
+              this.room.state = 'description';
+              this.startTimer(this.shuffleEndTime);
+              // 첫 번째 차례가 나라면 입력창에 포커스
+              if (firstPlayerId === this.playerId) {
+                this.$nextTick(() => {
+                  this.$refs.descriptionInput?.focus();
+                });
+              }
+            }, 1000);
+          } else {
+            // 점점 느려지는 효과
+            const delay = baseDelay + (iterations * 15);
+            setTimeout(animate, delay);
+          }
+        };
+
+        setTimeout(animate, 300);
       });
 
       // 설명 차례
@@ -199,6 +241,12 @@ function gameRoom() {
         const idx = this.descriptionOrder.findIndex(id => id === data.currentDescriberId);
         this.currentDescriberIndex = idx >= 0 ? idx : this.currentDescriberIndex + 1;
         this.startTimer(data.endTime);
+        // 내 차례면 입력창에 포커스
+        if (data.currentDescriberId === this.playerId) {
+          this.$nextTick(() => {
+            this.$refs.descriptionInput?.focus();
+          });
+        }
       });
 
       // 설명 제출됨
@@ -214,6 +262,10 @@ function gameRoom() {
         this.room.state = 'discussion';
         this.descriptions = data.descriptions;
         this.startTimer(data.endTime);
+        // 채팅 입력창에 포커스
+        this.$nextTick(() => {
+          this.$refs.chatInput?.focus();
+        });
       });
 
       // 채팅 메시지
@@ -263,7 +315,8 @@ function gameRoom() {
         this.defenderId = data.defenderId;
         this.myFinalVote = null;
         this.finalVoteCount = 0;
-        this.stopTimer();
+        this.voteResult = null;
+        this.startTimer(data.endTime);
       });
 
       // 최종 투표 현황
@@ -277,10 +330,13 @@ function gameRoom() {
         if (this.voteResultInterval) {
           clearInterval(this.voteResultInterval);
         }
+        // 타이머 정지
+        this.stopTimer();
 
         this.voteResult = {
           agree: data.agree,
           disagree: data.disagree,
+          abstain: data.abstain,
           confirmed: data.confirmed,
           nominatedPlayerId: data.nominatedPlayerId,
           countdown: 5
@@ -330,6 +386,12 @@ function gameRoom() {
         }
         // 타이머 시작 (30초)
         this.startTimer(data.endTime);
+        // 라이어면 입력창에 포커스
+        if (this.playerId === data.liarId) {
+          this.$nextTick(() => {
+            this.$refs.liarGuessInput?.focus();
+          });
+        }
       });
 
       // 게임 종료
@@ -515,8 +577,11 @@ function gameRoom() {
         // 호스트가 토론 종료 알림
         this.socket.emit('discussion-end');
       } else if (this.room.state === 'defense' && this.isHost) {
-        // 호스트가 변론 종료 알림
-        this.socket.emit('defense-end');
+        // 호스트가 변론 타임아웃 알림
+        this.socket.emit('defense-timeout');
+      } else if (this.room.state === 'final-vote' && this.isHost) {
+        // 호스트가 최종 투표 타이머 종료 알림 (무효표 처리)
+        this.socket.emit('final-vote-timeout');
       } else if (this.room.state === 'liar-guess' && this.isHost) {
         // 호스트가 라이어 정답 타이머 종료 알림
         this.socket.emit('liar-guess-timeout');

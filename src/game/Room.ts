@@ -146,6 +146,7 @@ export class GameRoom implements Room {
       finalVotes: {},
       discussionEndTime: 0,
       defenseEndTime: 0,
+      finalVoteEndTime: 0,
       liarGuessEndTime: 0,
       liarGuess: null
     };
@@ -296,6 +297,7 @@ export class GameRoom implements Room {
     if (!this.game) return;
     this.state = 'final-vote';
     this.game.finalVotes = {};
+    this.game.finalVoteEndTime = Date.now() + 15 * 1000; // 15초 고정
     this.updateActivity();
   }
 
@@ -310,9 +312,9 @@ export class GameRoom implements Room {
     return true;
   }
 
-  // 최종 투표 결과 계산
-  calculateFinalVoteResult(): { agree: number; disagree: number; confirmed: boolean } {
-    if (!this.game) return { agree: 0, disagree: 0, confirmed: false };
+  // 최종 투표 결과 계산 (투표하지 않은 사람은 무효표로 과반 계산에서 제외)
+  calculateFinalVoteResult(): { agree: number; disagree: number; abstain: number; confirmed: boolean } {
+    if (!this.game) return { agree: 0, disagree: 0, abstain: 0, confirmed: false };
 
     let agree = 0;
     let disagree = 0;
@@ -322,11 +324,15 @@ export class GameRoom implements Room {
       else disagree++;
     }
 
-    // 지목된 사람 제외한 인원 중 과반수
-    const votersCount = this.players.length - 1;
-    const confirmed = agree > votersCount / 2;
+    // 지목된 사람 제외한 인원 중 투표하지 않은 사람 = 무효표
+    const eligibleVoters = this.players.length - 1;
+    const abstain = eligibleVoters - (agree + disagree);
 
-    return { agree, disagree, confirmed };
+    // 투표한 사람 중 과반수 (무효표 제외)
+    const actualVoters = agree + disagree;
+    const confirmed = actualVoters > 0 && agree > actualVoters / 2;
+
+    return { agree, disagree, abstain, confirmed };
   }
 
   // 모든 플레이어가 최종 투표했는지

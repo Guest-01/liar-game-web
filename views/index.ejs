@@ -115,7 +115,7 @@
     <section x-data="lobbyData()" x-init="init()" class="lg:col-span-3">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-xl font-bold flex items-center gap-2">
-          <i data-lucide="home" class="w-5 h-5"></i> 방 목록
+          <i data-lucide="list" class="w-5 h-5"></i> 방 목록
         </h2>
         <div class="flex items-center gap-2">
           <a href="/create" class="px-3 py-2 bg-primary hover:bg-primary/80 rounded-lg transition-colors flex items-center gap-2 text-sm font-semibold">
@@ -131,7 +131,7 @@
 
       <!-- 빈 상태 -->
       <div x-show="rooms.length === 0" class="bg-gray-800/50 rounded-xl border border-gray-700/50 py-16 text-center text-gray-500">
-        <i data-lucide="users" class="w-12 h-12 mx-auto mb-4 opacity-50"></i>
+        <i data-lucide="help-circle" class="w-12 h-12 mx-auto mb-4 opacity-50"></i>
         <p class="font-medium">아직 열린 방이 없습니다</p>
         <p class="text-sm mt-1">첫 번째로 방을 만들어보세요!</p>
       </div>
