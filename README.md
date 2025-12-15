@@ -48,6 +48,6 @@
 
 배포는 클라우드 서버에 직접 호스팅하는 방식을 택했습니다. Digital Ocean의 저렴한 VPS인 Droplet을 사용하였고, 도메인은 Porkbun에서 구매하여 연결하였습니다.
 
-위 구성도에서 보듯이, Porkbun의 DNS를 통해 서브 도메인을 Digital Ocean Droplet의 IP로 연결하고, Caddy 서버를 리버스 프록시로 사용하여 HTTPS 인증서 발급 및 갱신을 자동화하였습니다. Express로 만든 본 프로젝트 어플리케이션은 Docker 컨테이너로 패키징하여 로컬호스트의 3000번 포트에서 실행되도록 하였습니다. 이때 리버스 프록시로만 접근이 가능하도록 도커의 포트 포워딩을 할 때 `127.0.0.1:3000:3000`으로 바인딩하였습니다.
+위 구성도에서 보듯이, Porkbun의 DNS를 통해 서브 도메인(와일드카드)을 Digital Ocean Droplet의 IP로 연결하였습니다. 그리고 도커 네트워크를 구성하여 Caddy 컨테이너를 `:80/443` 포트에 리버스 프록시로 사용하고 `liar-game` 서브 도메인에 `liar-game-web` 컨테이너를 연결하였습니다.
 
 > 최종 배포: https://liar-game.guest-01.dev
