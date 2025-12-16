@@ -45,6 +45,14 @@ function gameRoom() {
     myNomination: null,
     nominations: {},
 
+    // 모바일 채팅
+    mobileChatOpen: false,
+    mobileChatClosing: false,
+    unreadCount: 0,
+    swipeStartY: 0,
+    previewMessage: null,
+    previewTimeout: null,
+
     // 최후 변론
     defenderId: null,
 
@@ -286,9 +294,14 @@ function gameRoom() {
         if (this.chatMessages.length > 100) {
           this.chatMessages = this.chatMessages.slice(-100);
         }
+        // 모바일 채팅창이 닫혀있고 내 메시지가 아니면
+        if (!this.mobileChatOpen && data.playerId !== this.playerId) {
+          this.unreadCount++;
+          this.showMessagePreview(data);
+        }
         this.$nextTick(() => {
           // 모든 채팅 컨테이너 스크롤 (partial에서 chatContainerRef 사용)
-          document.querySelectorAll('[x-ref="chatContainerRef"]').forEach(container => {
+          document.querySelectorAll('[x-ref="chatContainerRef"], [x-ref="mobileChatContainerRef"]').forEach(container => {
             container.scrollTop = container.scrollHeight;
           });
         });
@@ -499,6 +512,61 @@ function gameRoom() {
       if (!message) return;
       this.socket.emit('chat-message', { message });
       this.chatInput = '';
+    },
+
+    // 모바일 채팅창 열기
+    openMobileChat() {
+      this.mobileChatOpen = true;
+      this.mobileChatClosing = false;
+      this.unreadCount = 0;
+      this.$nextTick(() => {
+        const container = document.querySelector('[x-ref="mobileChatContainerRef"]');
+        if (container) container.scrollTop = container.scrollHeight;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      });
+    },
+
+    // 모바일 채팅창 닫기 (애니메이션 포함)
+    closeMobileChat() {
+      if (this.mobileChatClosing) return;
+      this.mobileChatClosing = true;
+      // 애니메이션 완료 후 실제로 닫기
+      setTimeout(() => {
+        this.mobileChatOpen = false;
+        this.mobileChatClosing = false;
+      }, 200);
+    },
+
+    // 스와이프 시작
+    handleSwipeStart(e) {
+      this.swipeStartY = e.touches[0].clientY;
+    },
+
+    // 스와이프 종료
+    handleSwipeEnd(e) {
+      const deltaY = e.changedTouches[0].clientY - this.swipeStartY;
+      if (deltaY > 50) {
+        this.closeMobileChat();
+      }
+    },
+
+    // 메시지 미리보기 표시
+    showMessagePreview(data) {
+      if (this.previewTimeout) clearTimeout(this.previewTimeout);
+      this.previewMessage = {
+        nickname: data.nickname,
+        message: data.message
+      };
+      this.previewTimeout = setTimeout(() => {
+        this.previewMessage = null;
+      }, 3000);
+    },
+
+    // 미리보기 숨기고 채팅창 열기
+    hidePreviewAndOpenChat() {
+      if (this.previewTimeout) clearTimeout(this.previewTimeout);
+      this.previewMessage = null;
+      this.openMobileChat();
     },
 
     // 지목

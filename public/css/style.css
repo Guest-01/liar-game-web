@@ -94,3 +94,44 @@ button:active {
     padding-right: 1rem;
   }
 }
+
+/* 모바일 채팅창 슬라이드 애니메이션 */
+.mobile-chat-panel {
+  transform: translateY(100%);
+}
+
+.mobile-chat-panel.open {
+  animation: mobileChatSlideUp 0.25s ease-out forwards;
+}
+
+.mobile-chat-panel.closing {
+  animation: mobileChatSlideDown 0.2s ease-in forwards;
+}
+
+@keyframes mobileChatSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes mobileChatSlideDown {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* 모바일 채팅 배경 딤 */
+.mobile-chat-backdrop {
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.mobile-chat-backdrop.open {
+  opacity: 1;
+}
