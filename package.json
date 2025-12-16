@@ -1,6 +1,6 @@
 {
   "name": "liar-game-web",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "라이어 게임 (Word Wolf) 온라인 멀티플레이어 웹 애플리케이션",
   "main": "dist/index.js",
   "scripts": {
