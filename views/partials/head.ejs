@@ -74,10 +74,16 @@
     50% { opacity: 0.4; }
   }
 
-  /* 헤더 애니메이션: 글리치 효과 */
+  /* 헤더 애니메이션: 글리치 + 그라디언트 이동 효과 */
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
   .animate-glitch {
     position: relative;
-    animation: glitchMain 5s infinite;
+    background-size: 200% auto;
+    animation: glitchMain 5s infinite, gradientShift 3s ease infinite;
   }
 
   .animate-glitch::before,
@@ -88,21 +94,23 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(to right, #6366f1, #8b5cf6);
+    background: linear-gradient(to right, #6366f1, #8b5cf6, #6366f1);
+    background-size: 200% auto;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+    animation: gradientShift 3s ease infinite;
   }
 
   .animate-glitch::before {
     text-shadow: 2px 0 #ff00ff;
-    animation: glitchBefore 5s infinite;
+    animation: glitchBefore 5s infinite, gradientShift 3s ease infinite;
     clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
   }
 
   .animate-glitch::after {
     text-shadow: -2px 0 #00ffff;
-    animation: glitchAfter 5s infinite;
+    animation: glitchAfter 5s infinite, gradientShift 3s ease infinite;
     clip-path: polygon(0 65%, 100% 65%, 100% 100%, 0 100%);
   }
 

@@ -108,12 +108,12 @@
                 </span>
                 <div class="flex gap-3">
                   <button type="button" @click="updateSetting('gameMode', 'normal')"
-                    class="w-24 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-1"
+                    class="w-20 md:w-24 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-1"
                     :class="room.gameMode === 'normal' ? 'bg-primary' : 'bg-gray-700 hover:bg-gray-600'">
                     <i data-lucide="target" class="w-4 h-4"></i> 일반
                   </button>
                   <button type="button" @click="updateSetting('gameMode', 'fool')"
-                    class="w-24 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-1"
+                    class="w-20 md:w-24 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-1"
                     :class="room.gameMode === 'fool' ? 'bg-primary' : 'bg-gray-700 hover:bg-gray-600'">
                     <i data-lucide="smile" class="w-4 h-4"></i> 바보
                   </button>
@@ -153,7 +153,7 @@
                 <div class="flex items-center gap-3">
                   <input type="range" min="3" max="10" :value="room.maxPlayers"
                     @input="updateSetting('maxPlayers', parseInt($event.target.value))"
-                    class="w-40 lg:w-48 accent-primary">
+                    class="w-32 md:w-40 lg:w-48 accent-primary">
                   <span class="text-white font-medium" x-text="room.maxPlayers + '명'"></span>
                 </div>
               </div>
@@ -443,10 +443,10 @@
             <p class="text-3xl font-bold mb-6" x-text="getPlayerNickname(defenderId)"></p>
 
             <div x-show="defenderId !== playerId && myFinalVote === null" class="flex justify-center gap-4">
-              <button @click="finalVote(true)" class="px-8 py-4 bg-success hover:bg-success/80 rounded-xl font-bold text-xl flex items-center gap-2">
+              <button @click="finalVote(true)" class="px-8 py-4 bg-success hover:bg-success/80 rounded-xl font-bold text-lg md:text-xl flex items-center gap-2">
                 <i data-lucide="check" class="w-6 h-6"></i> 찬성
               </button>
-              <button @click="finalVote(false)" class="px-8 py-4 bg-danger hover:bg-danger/80 rounded-xl font-bold text-xl flex items-center gap-2">
+              <button @click="finalVote(false)" class="px-8 py-4 bg-danger hover:bg-danger/80 rounded-xl font-bold text-lg md:text-xl flex items-center gap-2">
                 <i data-lucide="x" class="w-6 h-6"></i> 반대
               </button>
             </div>
@@ -512,7 +512,7 @@
 
           <!-- 라이어를 맞췄다는 알림 -->
           <div class="bg-success/20 border border-success rounded-xl p-4">
-            <p class="text-success text-lg font-bold flex items-center justify-center gap-2">
+            <p class="text-success text-base md:text-lg font-bold flex items-center justify-center gap-2">
               <i data-lucide="check-circle" class="w-5 h-5"></i>
               <span x-text="getPlayerNickname(defenderId)"></span>님은 라이어가 맞았습니다!
             </p>

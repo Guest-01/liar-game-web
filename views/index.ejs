@@ -80,7 +80,7 @@
       <div x-data="{ open: window.innerWidth >= 1024 }" class="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
         <button
           @click="open = !open; $nextTick(() => lucide.createIcons())"
-          class="w-full p-4 flex items-center justify-between text-left hover:bg-gray-700/30 transition-colors"
+          class="w-full p-4 flex items-center justify-between text-left hover:bg-gray-700/30 focus:bg-transparent focus:hover:bg-gray-700/30 transition-colors"
         >
           <h3 class="font-semibold text-gray-300 flex items-center gap-2">
             <i data-lucide="info" class="w-4 h-4"></i> 게임 방법
@@ -215,11 +215,13 @@
   <!-- 푸터 -->
   <footer class="flex items-center mt-4 pt-2 border-t border-gray-800 text-xs text-gray-500">
     <span class="flex-1">© 2025 Guest-01</span>
-    <span class="flex-1 text-center">v<%= version %></span>
-    <a href="https://github.com/Guest-01/liar-game-web" target="_blank" rel="noopener" class="flex-1 flex items-center justify-end gap-1 hover:text-gray-300 transition-colors">
-      <i data-lucide="github" class="w-4 h-4"></i>
-      GitHub
-    </a>
+    <span class="flex-1 text-center font-mono">v<%= version %></span>
+    <span class="flex-1 flex justify-end">
+      <a href="https://github.com/Guest-01/liar-game-web" target="_blank" rel="noopener" class="flex items-center gap-1 hover:text-gray-300 transition-colors">
+        <i data-lucide="github" class="w-4 h-4"></i>
+        GitHub
+      </a>
+    </span>
   </footer>
 </div>
 
