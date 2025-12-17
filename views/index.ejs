@@ -80,7 +80,7 @@
       <div x-data="{ open: window.innerWidth >= 1024 }" class="mt-6 bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden">
         <button
           @click="open = !open; $nextTick(() => lucide.createIcons())"
-          class="w-full p-4 flex items-center justify-between text-left hover:bg-gray-700/30 focus:bg-transparent focus:hover:bg-gray-700/30 transition-colors"
+          class="w-full p-4 flex items-center justify-between text-left hover:bg-gray-700/30 focus:bg-transparent transition-colors"
         >
           <h3 class="font-semibold text-gray-300 flex items-center gap-2">
             <i data-lucide="info" class="w-4 h-4"></i> 게임 방법
@@ -123,7 +123,9 @@
             방 만들기
           </a>
           <button @click="refresh()" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-2 text-sm">
-            <i data-lucide="refresh-cw" class="w-4 h-4" :class="loading && 'animate-spin'"></i>
+            <span :class="loading && 'animate-spin'">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </span>
             새로고침
           </button>
         </div>

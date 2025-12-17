@@ -427,12 +427,12 @@
             <p class="text-gray-400 mb-2">이 사람이 라이어입니까?</p>
             <p class="text-3xl font-bold mb-6" x-text="getPlayerNickname(defenderId)"></p>
 
-            <div x-show="defenderId !== playerId && myFinalVote === null" class="flex justify-center gap-4">
-              <button @click="finalVote(true)" class="px-8 py-4 bg-success hover:bg-success/80 rounded-xl font-bold text-lg md:text-xl flex items-center gap-2">
-                <i data-lucide="check" class="w-6 h-6"></i> 찬성
+            <div x-show="defenderId !== playerId && myFinalVote === null" class="flex justify-center gap-3 md:gap-4">
+              <button @click="finalVote(true)" class="px-5 py-3 md:px-8 md:py-4 bg-success hover:bg-success/80 rounded-xl font-bold text-lg md:text-xl flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+                <i data-lucide="check" class="w-5 h-5 md:w-6 md:h-6"></i> 찬성
               </button>
-              <button @click="finalVote(false)" class="px-8 py-4 bg-danger hover:bg-danger/80 rounded-xl font-bold text-lg md:text-xl flex items-center gap-2">
-                <i data-lucide="x" class="w-6 h-6"></i> 반대
+              <button @click="finalVote(false)" class="px-5 py-3 md:px-8 md:py-4 bg-danger hover:bg-danger/80 rounded-xl font-bold text-lg md:text-xl flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+                <i data-lucide="x" class="w-5 h-5 md:w-6 md:h-6"></i> 반대
               </button>
             </div>
 

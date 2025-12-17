@@ -1,7 +1,6 @@
 import express from 'express';
 import { createServer } from 'http';
 import path from 'path';
-import dotenv from 'dotenv';
 import { createSocketServer } from './socket';
 import { roomManager } from './game/RoomManager';
 import { getCategoryNames } from './data/words';
@@ -9,9 +8,6 @@ import logger from './logger';
 
 // 버전 정보
 const { version } = require('../package.json');
-
-// 환경 변수 로드
-dotenv.config();
 
 const app = express();
 
