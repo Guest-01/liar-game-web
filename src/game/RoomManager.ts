@@ -140,6 +140,7 @@ export class RoomManager {
       const timeout = setTimeout(() => {
         if (room.players.length === 0) {
           this.rooms.delete(roomId);
+          this.hostTokens.delete(roomId);
           this.pendingDeletions.delete(roomId);
         }
       }, 5000);
@@ -168,7 +169,8 @@ export class RoomManager {
     const lobbyRooms: LobbyRoomInfo[] = [];
 
     for (const room of this.rooms.values()) {
-      if (room.state === 'waiting' && room.players.length < room.maxPlayers) {
+      // 대기 중 + 최소 1명 이상 + 인원 미달인 방만 표시
+      if (room.state === 'waiting' && room.players.length > 0 && room.players.length < room.maxPlayers) {
         lobbyRooms.push(room.getLobbyInfo());
       }
     }
@@ -187,6 +189,13 @@ export class RoomManager {
         for (const player of room.players) {
           this.playerToRoom.delete(player.id);
         }
+        // 예약된 삭제 타이머 취소
+        const pendingTimeout = this.pendingDeletions.get(id);
+        if (pendingTimeout) {
+          clearTimeout(pendingTimeout);
+          this.pendingDeletions.delete(id);
+        }
+        this.hostTokens.delete(id);
         this.rooms.delete(id);
         cleaned++;
       }

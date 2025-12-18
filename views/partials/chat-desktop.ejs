@@ -3,15 +3,7 @@
     <i data-lucide="message-square" class="w-4 h-4"></i> 채팅
   </h3>
   <div class="flex-1 overflow-y-auto space-y-2 mb-3" x-ref="chatContainerRef">
-    <template x-for="msg in chatMessages" :key="msg.timestamp">
-      <div class="text-sm">
-        <span class="font-medium text-primary" x-text="msg.nickname + ':'"></span>
-        <span x-text="msg.message"></span>
-      </div>
-    </template>
-    <div x-show="chatMessages.length === 0" class="text-gray-500 text-sm text-center py-4">
-      아직 메시지가 없습니다
-    </div>
+    <%- include('chat-messages') %>
   </div>
   <!-- 변론 중에는 변론자만 입력 가능 -->
   <form @submit.prevent="sendChat()" class="flex gap-2"

@@ -45,7 +45,7 @@
               @keydown.escape="cancelEdit()"
               x-ref="nicknameInput"
               maxlength="10"
-              class="flex-1 px-3 py-2 bg-gray-700 border border-primary rounded-lg focus:ring-2 focus:ring-primary outline-none text-lg font-semibold"
+              class="flex-1 min-w-0 px-3 py-2 bg-gray-700 border border-primary rounded-lg focus:ring-2 focus:ring-primary outline-none text-lg font-semibold"
             >
           </template>
 
@@ -98,11 +98,11 @@
             <div class="space-y-2 text-xs">
               <div class="flex items-center gap-2 text-gray-500">
                 <i data-lucide="target" class="w-3.5 h-3.5"></i>
-                <span><strong class="text-gray-400">일반</strong>: 라이어는 제시어 없이 유추해야 함</span>
+                <span><strong class="text-gray-400">일반 모드</strong>: 라이어는 제시어 없이 유추해야 함</span>
               </div>
               <div class="flex items-center gap-2 text-gray-500">
                 <i data-lucide="smile" class="w-3.5 h-3.5"></i>
-                <span><strong class="text-gray-400">바보</strong>: 라이어도 자신이 라이어인지 모름</span>
+                <span><strong class="text-gray-400">바보 모드</strong>: 라이어도 자신이 라이어인지 모름</span>
               </div>
             </div>
           </div>
@@ -320,11 +320,20 @@ function lobbyData() {
       // 초기 렌더링 후 Lucide 아이콘 생성
       this.$nextTick(() => lucide.createIcons());
 
-      // 주기적으로 새로고침
-      setInterval(() => this.refresh(), 10000);
-
-      // 소켓 연결 (검증용)
+      // 소켓 연결
       this.socket = io();
+
+      // 로비 입장 - 실시간 방 목록 수신
+      this.socket.emit('join-lobby');
+
+      // 방 목록 실시간 업데이트
+      this.socket.on('lobby-rooms', (data) => {
+        this.rooms = data.rooms;
+        this.loading = false;
+        this.$nextTick(() => lucide.createIcons());
+      });
+
+      // 방 입장 검증 결과
       this.socket.on('verify-join-result', (data) => {
         this.joinModal.loading = false;
         if (data.success) {
@@ -341,17 +350,10 @@ function lobbyData() {
       });
     },
 
-    async refresh() {
+    refresh() {
       this.loading = true;
-      try {
-        const res = await fetch('/api/rooms');
-        const data = await res.json();
-        this.rooms = data.rooms;
-        this.$nextTick(() => lucide.createIcons());
-      } catch (e) {
-        // 방 목록 로딩 실패 시 무시 (10초마다 재시도함)
-      }
-      this.loading = false;
+      // 소켓으로 방 목록 요청 (lobby-rooms 이벤트로 응답 받음)
+      this.socket.emit('join-lobby');
     },
 
     joinRoom(room) {

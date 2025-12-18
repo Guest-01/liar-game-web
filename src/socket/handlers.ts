@@ -8,11 +8,29 @@ function sanitizeInput(input: string, maxLength: number = 100): string {
   return input?.slice(0, maxLength).replace(/[<>]/g, '') || '';
 }
 
+// 로비에 방 목록 변경 브로드캐스트
+function broadcastLobbyUpdate(io: Server): void {
+  const rooms = roomManager.getLobbyRooms();
+  io.to('lobby').emit('lobby-rooms', { rooms });
+}
+
 export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
     logger.debug({ socketId: socket.id }, '클라이언트 연결');
 
-    // 로비 방 목록 요청
+    // 로비 입장 (실시간 방 목록 수신)
+    socket.on('join-lobby', () => {
+      socket.join('lobby');
+      const rooms = roomManager.getLobbyRooms();
+      socket.emit('lobby-rooms', { rooms });
+    });
+
+    // 로비 퇴장
+    socket.on('leave-lobby', () => {
+      socket.leave('lobby');
+    });
+
+    // 로비 방 목록 요청 (하위 호환성)
     socket.on('get-lobby-rooms', () => {
       const rooms = roomManager.getLobbyRooms();
       socket.emit('lobby-rooms', { rooms });
@@ -103,6 +121,9 @@ export function setupSocketHandlers(io: Server): void {
       // 방 생성만 하고, 호스트는 hostToken과 함께 리다이렉트 후 참가
       socket.emit('room-created', { roomId: room.id, hostToken });
 
+      // 로비에 방 목록 업데이트 브로드캐스트
+      broadcastLobbyUpdate(io);
+
       logger.info({ roomId: room.id, roomName }, `방 생성 | ${room.id} | ${roomName}`);
     });
 
@@ -145,6 +166,9 @@ export function setupSocketHandlers(io: Server): void {
       // 다른 플레이어들에게 알림
       const player = room.players.find(p => p.id === socket.id);
       socket.to(room.id).emit('player-joined', { player });
+
+      // 로비에 방 목록 업데이트 (인원 변경)
+      broadcastLobbyUpdate(io);
 
       logger.info({ roomId, nickname }, `방 참가 | ${roomId} | ${nickname}`);
     });
@@ -191,6 +215,9 @@ export function setupSocketHandlers(io: Server): void {
         playerId: data.targetId,
         nickname
       });
+
+      // 로비에 방 목록 업데이트 (인원 변경)
+      broadcastLobbyUpdate(io);
     });
 
     // 게임 설정 변경 (대기실에서 호스트만)
@@ -227,6 +254,9 @@ export function setupSocketHandlers(io: Server): void {
         room: room.getInfoForClient()
       });
 
+      // 로비에 방 목록 업데이트 (최대 인원 등 설정 변경)
+      broadcastLobbyUpdate(io);
+
       logger.info({ roomId: room.id, settings: data }, `설정 변경 | ${room.id}`);
     });
 
@@ -261,6 +291,9 @@ export function setupSocketHandlers(io: Server): void {
           category: room.category // 랜덤인 경우 실제 선택된 카테고리
         });
       }
+
+      // 로비에 방 목록 업데이트 (상태 변경: 게임 중)
+      broadcastLobbyUpdate(io);
 
       logger.info({ roomId: room.id, playerCount: room.players.length }, `게임 시작 | ${room.id} | ${room.players.length}명`);
     });
@@ -630,6 +663,9 @@ export function setupSocketHandlers(io: Server): void {
       io.to(room.id).emit('game-reset', {
         room: room.getInfoForClient()
       });
+
+      // 로비에 방 목록 업데이트 (상태 변경: 대기 중)
+      broadcastLobbyUpdate(io);
     });
 
     // 연결 해제
@@ -695,6 +731,11 @@ function handleLeaveRoom(socket: Socket, io: Server): void {
         });
       }
     }
+  }
+
+  // 로비에 방 목록 업데이트 (인원 변경 또는 방 삭제)
+  if (roomBeforeLeave) {
+    broadcastLobbyUpdate(io);
   }
 
   socket.leave(room?.id || '');

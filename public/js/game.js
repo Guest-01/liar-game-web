@@ -186,7 +186,7 @@ function gameRoom() {
         this.wordChecked = false;
         this.checkedCount = 0;
         this.descriptions = {};
-        this.chatMessages = [];
+        this.addSystemMessage('게임이 시작되었습니다');
         this.myNomination = null;
         this.nominations = {};
         this.myFinalVote = null;
@@ -611,13 +611,27 @@ function gameRoom() {
       this.wordRevealed = false;
       this.wordChecked = false;
       this.descriptions = {};
-      this.chatMessages = [];
+      this.addSystemMessage('대기실로 돌아왔습니다');
       this.myNomination = null;
       this.nominations = {};
       this.myFinalVote = null;
       this.gameResult = null;
       this.myDescriptionSubmitted = false;
       this.stopTimer();
+    },
+
+    // 시스템 메시지 추가
+    addSystemMessage(message) {
+      this.chatMessages.push({
+        isSystem: true,
+        message,
+        timestamp: Date.now()
+      });
+      this.$nextTick(() => {
+        document.querySelectorAll('[x-ref="chatContainerRef"], [x-ref="mobileChatContainerRef"]').forEach(container => {
+          container.scrollTop = container.scrollHeight;
+        });
+      });
     },
 
     // 타이머 시작

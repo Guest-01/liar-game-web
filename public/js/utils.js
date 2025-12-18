@@ -7,19 +7,6 @@ function formatTime(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function copyToClipboard(text) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text);
-  } else {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-  }
-}
-
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white z-50 fade-in ${
