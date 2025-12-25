@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /create
+Disallow: /room/
+Disallow: /api/
+
+Sitemap: https://liar-game.guest-01.dev/sitemap.xml

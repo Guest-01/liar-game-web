@@ -1,7 +1,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %>라이어 게임</title>
-<meta name="description" content="온라인 멀티플레이어 라이어 게임 (Word Wolf)">
+<meta name="description" content="<%= typeof description !== 'undefined' ? description : '온라인 멀티플레이어 라이어 게임 (Word Wolf)' %>">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="<%= typeof title !== 'undefined' ? title + ' - ' : '' %>라이어 게임">
+<meta property="og:description" content="<%= typeof description !== 'undefined' ? description : '친구들과 함께하는 온라인 멀티플레이어 라이어 게임' %>">
+<meta property="og:url" content="<%= baseUrl %><%= typeof path !== 'undefined' ? path : '/' %>">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:site_name" content="라이어 게임">
+<meta property="og:image" content="<%= baseUrl %>/og-image.png">
 
 <!-- Favicon -->
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">

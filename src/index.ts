@@ -13,6 +13,7 @@ const app = express();
 
 // 모든 뷰에서 사용할 수 있는 전역 변수
 app.locals.version = version;
+app.locals.baseUrl = process.env.BASE_URL || 'https://liar-game.guest-01.dev';
 const httpServer = createServer(app);
 const io = createSocketServer(httpServer);
 
@@ -35,12 +36,21 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/', (req, res) => {
   const lobbyRooms = roomManager.getLobbyRooms();
   const categories = getCategoryNames();
-  res.render('index', { lobbyRooms, categories });
+  res.render('index', {
+    lobbyRooms,
+    categories,
+    path: '/',
+    description: '친구들과 함께하는 온라인 멀티플레이어 라이어 게임. 방을 만들거나 참가하세요!'
+  });
 });
 
 // 방 생성 페이지
 app.get('/create', (req, res) => {
-  res.render('create');
+  res.render('create', {
+    title: '방 만들기',
+    path: '/create',
+    description: '새로운 라이어 게임 방을 만들어 친구들을 초대하세요.'
+  });
 });
 
 // 게임 방
@@ -56,7 +66,10 @@ app.get('/room/:id', (req, res) => {
   res.render('room', {
     roomId: id,
     room: room.getInfoForClient(),
-    categories
+    categories,
+    title: room.name,
+    path: `/room/${id}`,
+    description: `라이어 게임 - ${room.name}`
   });
 });
 
