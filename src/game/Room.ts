@@ -1,5 +1,5 @@
 import { Room, Player, Game, RoomState, GameMode, LobbyRoomInfo, RoomInfoForClient, REDO_DESCRIPTION_ID } from './types';
-import { getRandomWordPair, getCategoryNames } from '../data/words';
+import { getRandomWords, getCategoryNames } from '../data/words';
 
 export class GameRoom implements Room {
   id: string;
@@ -123,8 +123,8 @@ export class GameRoom implements Room {
     const liarIndex = Math.floor(Math.random() * this.players.length);
     const liarId = this.players[liarIndex].id;
 
-    // 단어 쌍 가져오기
-    const wordPair = getRandomWordPair(category);
+    // 단어 가져오기
+    const wordPair = getRandomWords(category);
     if (!wordPair) return false;
 
     // 설명 순서 랜덤 셔플

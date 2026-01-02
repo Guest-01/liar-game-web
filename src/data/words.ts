@@ -3,128 +3,80 @@ import { WordCategory } from '../game/types';
 export const categories: WordCategory[] = [
   {
     name: "음식",
-    pairs: [
-      { citizen: "커피", liar: "홍차" },
-      { citizen: "피자", liar: "파스타" },
-      { citizen: "치킨", liar: "오리구이" },
-      { citizen: "김치찌개", liar: "된장찌개" },
-      { citizen: "햄버거", liar: "샌드위치" },
-      { citizen: "초밥", liar: "회" },
-      { citizen: "짜장면", liar: "짬뽕" },
-      { citizen: "떡볶이", liar: "라볶이" },
-      { citizen: "삼겹살", liar: "목살" },
-      { citizen: "비빔밥", liar: "돌솥밥" },
-      { citizen: "라면", liar: "우동" },
-      { citizen: "김밥", liar: "유부초밥" },
-      { citizen: "아이스크림", liar: "빙수" },
-      { citizen: "케이크", liar: "파이" },
-      { citizen: "도넛", liar: "베이글" }
+    words: [
+      "커피", "홍차", "피자", "파스타", "치킨",
+      "오리구이", "김치찌개", "된장찌개", "햄버거", "샌드위치",
+      "초밥", "회", "짜장면", "짬뽕", "떡볶이",
+      "라볶이", "삼겹살", "목살", "비빔밥", "돌솥밥",
+      "라면", "우동", "김밥", "유부초밥", "아이스크림",
+      "빙수", "케이크", "파이", "도넛", "베이글"
     ]
   },
   {
     name: "동물",
-    pairs: [
-      { citizen: "강아지", liar: "고양이" },
-      { citizen: "사자", liar: "호랑이" },
-      { citizen: "토끼", liar: "햄스터" },
-      { citizen: "독수리", liar: "매" },
-      { citizen: "돌고래", liar: "고래" },
-      { citizen: "펭귄", liar: "바다표범" },
-      { citizen: "기린", liar: "얼룩말" },
-      { citizen: "코끼리", liar: "하마" },
-      { citizen: "원숭이", liar: "침팬지" },
-      { citizen: "늑대", liar: "여우" },
-      { citizen: "곰", liar: "판다" },
-      { citizen: "뱀", liar: "도마뱀" },
-      { citizen: "상어", liar: "가오리" },
-      { citizen: "앵무새", liar: "카나리아" },
-      { citizen: "거북이", liar: "악어" }
+    words: [
+      "강아지", "고양이", "사자", "호랑이", "토끼",
+      "햄스터", "독수리", "매", "돌고래", "고래",
+      "펭귄", "바다표범", "기린", "얼룩말", "코끼리",
+      "하마", "원숭이", "침팬지", "늑대", "여우",
+      "곰", "판다", "뱀", "도마뱀", "상어",
+      "가오리", "앵무새", "카나리아", "거북이", "악어"
     ]
   },
   {
     name: "장소",
-    pairs: [
-      { citizen: "학교", liar: "학원" },
-      { citizen: "병원", liar: "약국" },
-      { citizen: "카페", liar: "레스토랑" },
-      { citizen: "도서관", liar: "서점" },
-      { citizen: "영화관", liar: "극장" },
-      { citizen: "공원", liar: "놀이터" },
-      { citizen: "마트", liar: "편의점" },
-      { citizen: "헬스장", liar: "수영장" },
-      { citizen: "은행", liar: "우체국" },
-      { citizen: "공항", liar: "기차역" },
-      { citizen: "해변", liar: "수영장" },
-      { citizen: "산", liar: "언덕" },
-      { citizen: "놀이공원", liar: "동물원" },
-      { citizen: "박물관", liar: "미술관" },
-      { citizen: "호텔", liar: "모텔" }
+    words: [
+      "학교", "학원", "병원", "약국", "카페",
+      "레스토랑", "도서관", "서점", "영화관", "극장",
+      "공원", "놀이터", "마트", "편의점", "헬스장",
+      "수영장", "은행", "우체국", "공항", "기차역",
+      "해변", "산", "언덕", "놀이공원", "동물원",
+      "박물관", "미술관", "호텔", "모텔", "경찰서"
     ]
   },
   {
     name: "직업",
-    pairs: [
-      { citizen: "의사", liar: "간호사" },
-      { citizen: "선생님", liar: "교수" },
-      { citizen: "경찰", liar: "소방관" },
-      { citizen: "요리사", liar: "제빵사" },
-      { citizen: "가수", liar: "배우" },
-      { citizen: "변호사", liar: "검사" },
-      { citizen: "기자", liar: "작가" },
-      { citizen: "디자이너", liar: "개발자" },
-      { citizen: "파일럿", liar: "승무원" },
-      { citizen: "축구선수", liar: "야구선수" },
-      { citizen: "사진가", liar: "화가" },
-      { citizen: "건축가", liar: "인테리어 디자이너" },
-      { citizen: "수의사", liar: "조련사" },
-      { citizen: "판사", liar: "변호사" },
-      { citizen: "약사", liar: "의사" }
+    words: [
+      "의사", "간호사", "선생님", "교수", "경찰",
+      "소방관", "요리사", "제빵사", "가수", "배우",
+      "변호사", "검사", "기자", "작가", "디자이너",
+      "개발자", "파일럿", "승무원", "축구선수", "야구선수",
+      "사진가", "화가", "건축가", "인테리어 디자이너", "수의사",
+      "조련사", "판사", "약사", "회계사", "세무사"
     ]
   },
   {
     name: "스포츠",
-    pairs: [
-      { citizen: "축구", liar: "풋살" },
-      { citizen: "농구", liar: "배구" },
-      { citizen: "야구", liar: "소프트볼" },
-      { citizen: "테니스", liar: "배드민턴" },
-      { citizen: "수영", liar: "다이빙" },
-      { citizen: "골프", liar: "미니골프" },
-      { citizen: "스키", liar: "스노보드" },
-      { citizen: "마라톤", liar: "조깅" },
-      { citizen: "복싱", liar: "태권도" },
-      { citizen: "탁구", liar: "스쿼시" },
-      { citizen: "볼링", liar: "당구" },
-      { citizen: "요가", liar: "필라테스" },
-      { citizen: "하키", liar: "아이스하키" },
-      { citizen: "레슬링", liar: "유도" },
-      { citizen: "양궁", liar: "사격" }
+    words: [
+      "축구", "풋살", "농구", "배구", "야구",
+      "소프트볼", "테니스", "배드민턴", "수영", "다이빙",
+      "골프", "미니골프", "스키", "스노보드", "마라톤",
+      "조깅", "복싱", "태권도", "탁구", "스쿼시",
+      "볼링", "당구", "요가", "필라테스", "하키",
+      "아이스하키", "레슬링", "유도", "양궁", "사격"
     ]
   },
   {
     name: "브랜드",
-    pairs: [
-      { citizen: "애플", liar: "삼성" },
-      { citizen: "나이키", liar: "아디다스" },
-      { citizen: "코카콜라", liar: "펩시" },
-      { citizen: "맥도날드", liar: "버거킹" },
-      { citizen: "스타벅스", liar: "투썸플레이스" },
-      { citizen: "넷플릭스", liar: "디즈니플러스" },
-      { citizen: "구글", liar: "네이버" },
-      { citizen: "유튜브", liar: "틱톡" },
-      { citizen: "인스타그램", liar: "페이스북" },
-      { citizen: "카카오톡", liar: "라인" }
+    words: [
+      "애플", "삼성", "나이키", "아디다스", "코카콜라",
+      "펩시", "맥도날드", "버거킹", "스타벅스", "투썸플레이스",
+      "넷플릭스", "디즈니플러스", "구글", "네이버", "유튜브",
+      "틱톡", "인스타그램", "페이스북", "카카오톡", "라인",
+      "LG", "소니", "현대", "도요타", "BMW",
+      "벤츠", "롯데", "신세계", "이케아", "무인양품"
     ]
   }
 ];
 
-export function getRandomWordPair(categoryName: string): { citizen: string; liar: string } | null {
+export function getRandomWords(categoryName: string): { citizen: string; liar: string } | null {
   const category = categories.find(c => c.name === categoryName);
-  if (!category || category.pairs.length === 0) {
+  if (!category || category.words.length < 2) {
     return null;
   }
-  const randomIndex = Math.floor(Math.random() * category.pairs.length);
-  return category.pairs[randomIndex];
+
+  const shuffled = [...category.words].sort(() => Math.random() - 0.5);
+  return { citizen: shuffled[0], liar: shuffled[1] };
 }
 
 export function getCategoryNames(): string[] {

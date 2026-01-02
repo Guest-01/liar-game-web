@@ -64,16 +64,10 @@ export interface Room {
   lastActivity: number;
 }
 
-// 단어 쌍
-export interface WordPair {
-  citizen: string;
-  liar: string;
-}
-
 // 단어 카테고리
 export interface WordCategory {
   name: string;
-  pairs: WordPair[];
+  words: string[];
 }
 
 // 로비 방 정보
