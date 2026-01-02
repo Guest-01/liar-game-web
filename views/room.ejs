@@ -290,7 +290,15 @@
                   <span class="text-primary font-mono">(<span x-text="currentDescriberIndex + 1"></span>/<span x-text="room.players?.length"></span>)</span>
                 </p>
                 <p class="text-2xl font-bold" x-text="currentDescriber.nickname"></p>
-                <p x-show="currentDescriber.id === playerId" class="text-primary mt-2">(당신의 차례입니다!)</p>
+                <!-- 타이핑 중일 때 -->
+                <p x-show="isTyping && typingPlayerId === currentDescriber.id" class="text-lg text-yellow-300 font-medium typing-text mt-3" x-text="typingText"></p>
+                <!-- 타이핑 중이 아닐 때 -->
+                <p x-show="!isTyping && currentDescriber.id === playerId" class="text-primary mt-2">(당신의 차례입니다!)</p>
+                <div x-show="!isTyping && currentDescriber.id !== playerId" class="flex justify-center items-center gap-1 mt-3">
+                  <span class="typing-dot"></span>
+                  <span class="typing-dot"></span>
+                  <span class="typing-dot"></span>
+                </div>
               </div>
             </template>
           </div>
@@ -349,7 +357,11 @@
                     <span class="text-gray-300" x-text="descriptions[player.id] || '...'"></span>
                   </div>
                   <div class="flex items-center gap-2 flex-shrink-0">
-                    <span class="text-xs text-gray-400" x-text="getNominationCount(player.id) + '표'"></span>
+                    <span
+                      class="text-xs text-gray-400"
+                      :class="nominationPulse[player.id] && 'nomination-pulse'"
+                      x-text="getNominationCount(player.id) + '표'"
+                    ></span>
                     <button
                       x-show="player.id !== playerId"
                       @click="nominate(player.id)"
@@ -370,7 +382,11 @@
                   <span class="font-medium text-yellow-400">한줄 설명 다시하기</span>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
-                  <span class="text-xs text-gray-400" x-text="getNominationCount(REDO_DESCRIPTION_ID) + '표'"></span>
+                  <span
+                    class="text-xs text-gray-400"
+                    :class="nominationPulse[REDO_DESCRIPTION_ID] && 'nomination-pulse'"
+                    x-text="getNominationCount(REDO_DESCRIPTION_ID) + '표'"
+                  ></span>
                   <button
                     @click="nominate(REDO_DESCRIPTION_ID)"
                     class="px-3 py-1 rounded-lg text-sm transition-colors"
@@ -447,41 +463,66 @@
           </div>
 
           <!-- 투표 결과 UI (결과가 있을 때) -->
-          <div x-show="voteResult" class="bg-gray-800 rounded-xl p-8 space-y-6">
-            <div>
-              <p class="text-gray-400 mb-2">투표 결과</p>
-              <div class="flex justify-center items-center gap-2 md:gap-4 text-lg md:text-2xl flex-wrap">
-                <span class="text-success font-bold flex items-center gap-1">
-                  <i data-lucide="check" class="w-5 h-5 md:w-6 md:h-6"></i>
-                  찬성 <span x-text="voteResult?.agree"></span>표
-                </span>
-                <span class="text-gray-500">/</span>
-                <span class="text-danger font-bold flex items-center gap-1">
-                  <i data-lucide="x" class="w-5 h-5 md:w-6 md:h-6"></i>
-                  반대 <span x-text="voteResult?.disagree"></span>표
-                </span>
-                <span x-show="voteResult?.abstain > 0" class="text-gray-500 flex items-center gap-1">
-                  / <i data-lucide="minus" class="w-5 h-5 md:w-6 md:h-6"></i>
-                  무효 <span x-text="voteResult?.abstain"></span>표
-                </span>
-              </div>
-            </div>
+          <div x-show="voteResult" class="bg-gray-800 rounded-xl p-6" :class="liarRevealPhase === 0 ? 'space-y-6' : ''">
+            <!-- 카운트다운 중 (라이어 공개 애니메이션 전) -->
+            <template x-if="liarRevealPhase === 0">
+              <div class="space-y-6">
+                <div>
+                  <p class="text-gray-400 mb-2">투표 결과</p>
+                  <div class="flex justify-center items-center gap-2 md:gap-4 text-lg md:text-2xl flex-wrap">
+                    <span class="text-success font-bold flex items-center gap-1">
+                      <i data-lucide="check" class="w-5 h-5 md:w-6 md:h-6"></i>
+                      찬성 <span x-text="voteResult?.agree"></span>표
+                    </span>
+                    <span class="text-gray-500">/</span>
+                    <span class="text-danger font-bold flex items-center gap-1">
+                      <i data-lucide="x" class="w-5 h-5 md:w-6 md:h-6"></i>
+                      반대 <span x-text="voteResult?.disagree"></span>표
+                    </span>
+                    <span x-show="voteResult?.abstain > 0" class="text-gray-500 flex items-center gap-1">
+                      / <i data-lucide="minus" class="w-5 h-5 md:w-6 md:h-6"></i>
+                      무효 <span x-text="voteResult?.abstain"></span>표
+                    </span>
+                  </div>
+                </div>
 
-            <div class="border-t border-gray-700 pt-6">
-              <p x-show="voteResult?.confirmed" class="text-xl text-success flex items-center justify-center gap-2">
-                <i data-lucide="check-circle" class="w-6 h-6"></i>
-                과반수 찬성!
-              </p>
-              <p x-show="!voteResult?.confirmed" class="text-xl text-warning flex items-center justify-center gap-2">
-                <i data-lucide="alert-circle" class="w-6 h-6"></i>
-                과반수 미달
-              </p>
-              <p class="text-gray-400 mt-4">
-                <span x-text="voteResult?.countdown"></span>초 후
-                <span x-show="voteResult?.confirmed">라이어를 공개합니다...</span>
-                <span x-show="!voteResult?.confirmed">토론으로 돌아갑니다...</span>
-              </p>
-            </div>
+                <div class="border-t border-gray-700 pt-6">
+                  <p x-show="voteResult?.confirmed" class="text-xl text-success flex items-center justify-center gap-2">
+                    <i data-lucide="check-circle" class="w-6 h-6"></i>
+                    과반수 찬성!
+                  </p>
+                  <p x-show="!voteResult?.confirmed" class="text-xl text-warning flex items-center justify-center gap-2">
+                    <i data-lucide="alert-circle" class="w-6 h-6"></i>
+                    과반수 미달
+                  </p>
+                  <p class="text-gray-400 mt-4">
+                    <span x-text="voteResult?.countdown"></span>초 후
+                    <span x-show="voteResult?.confirmed">라이어를 공개합니다...</span>
+                    <span x-show="!voteResult?.confirmed">토론으로 돌아갑니다...</span>
+                  </p>
+                </div>
+              </div>
+            </template>
+
+            <!-- 라이어 공개 애니메이션 Phase 1: 타이핑 중 -->
+            <template x-if="liarRevealPhase === 1">
+              <div class="text-center">
+                <p class="text-xl md:text-2xl font-bold typing-text" x-text="liarRevealText"></p>
+              </div>
+            </template>
+
+            <!-- 라이어 공개 애니메이션 Phase 2: "맞습니다!" / "아닙니다!" -->
+            <template x-if="liarRevealPhase === 2">
+              <div class="text-center">
+                <p class="text-xl md:text-2xl font-bold text-gray-300 mb-4" x-text="liarRevealFullText"></p>
+                <p x-show="liarRevealIsLiar" class="text-4xl md:text-5xl font-bold text-danger liar-reveal-text">
+                  맞습니다!
+                </p>
+                <p x-show="!liarRevealIsLiar" class="text-4xl md:text-5xl font-bold text-primary liar-reveal-text">
+                  아닙니다!
+                </p>
+              </div>
+            </template>
           </div>
         </div>
 

@@ -3,10 +3,20 @@ import { roomManager } from '../game/RoomManager';
 import { GameMode, REDO_DESCRIPTION_ID } from '../game/types';
 import logger from '../logger';
 
-// XSS 방지 - 위험한 문자 제거
+// XSS 방지 - HTML 엔티티 인코딩
 function sanitizeInput(input: string, maxLength: number = 100): string {
-  return input?.slice(0, maxLength).replace(/[<>]/g, '') || '';
+  if (!input) return '';
+  return input
+    .slice(0, maxLength)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
 }
+
+// 동시 요청 방지를 위한 처리 중 플레이어 Set
+const pendingJoins = new Set<string>();
 
 // 로비에 방 목록 변경 브로드캐스트
 function broadcastLobbyUpdate(io: Server): void {
@@ -138,7 +148,15 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
 
+      // 동시 요청 방지
+      if (pendingJoins.has(socket.id)) {
+        socket.emit('error', { message: '요청 처리 중입니다.' });
+        return;
+      }
+      pendingJoins.add(socket.id);
+
       const result = roomManager.joinRoom(roomId, socket.id, nickname, { password, hostToken });
+      pendingJoins.delete(socket.id);
       if (!result.room) {
         const errorMessages: Record<string, string> = {
           'room-not-found': '방이 존재하지 않습니다.',
@@ -305,16 +323,16 @@ export function setupSocketHandlers(io: Server): void {
 
       const allChecked = room.checkWord(socket.id);
 
-      if (allChecked) {
+      if (allChecked && room.game) {
         // 한줄 설명 단계 시작 (상태 변경은 클라이언트에서 처리)
         const currentDescriberId = room.getCurrentDescriberId();
         const endTime = Date.now() + room.descriptionTime * 1000;
         io.to(room.id).emit('description-phase-start', {
           currentDescriberId,
           endTime,
-          order: room.game?.descriptionOrder
+          order: room.game.descriptionOrder
         });
-      } else {
+      } else if (!allChecked) {
         // 아직 전원 확인 안 됐을 때만 상태 업데이트
         io.to(room.id).emit('room-state-update', { state: room.state, players: room.players });
       }
@@ -339,31 +357,45 @@ export function setupSocketHandlers(io: Server): void {
         description
       });
 
-      // 모든 설명이 끝났는지 확인
-      if (room.state === 'discussion') {
-        // 토론 단계 시작
-        io.to(room.id).emit('discussion-start', {
-          descriptions: room.game.descriptions,
-          endTime: room.game.discussionEndTime
-        });
-      } else {
-        // 다음 설명자 차례
-        const nextDescriberId = room.getCurrentDescriberId();
-        const endTime = Date.now() + room.descriptionTime * 1000;
-        io.to(room.id).emit('description-turn', {
-          currentDescriberId: nextDescriberId,
-          endTime
-        });
-      }
+      // 타이핑 애니메이션 3.5초 대기 후 다음 단계로 (클라이언트 애니메이션 완료 보장)
+      const nextState = room.state;
+      const roomId = room.id;
+      const timeout = setTimeout(() => {
+        const currentRoom = roomManager.getRoom(roomId);
+        if (!currentRoom || !currentRoom.game) return;
+
+        if (nextState === 'discussion') {
+          // 토론 단계 시작
+          io.to(roomId).emit('discussion-start', {
+            descriptions: currentRoom.game.descriptions,
+            endTime: currentRoom.game.discussionEndTime
+          });
+        } else {
+          // 다음 설명자 차례
+          const nextDescriberId = currentRoom.getCurrentDescriberId();
+          const endTime = Date.now() + currentRoom.descriptionTime * 1000;
+          io.to(roomId).emit('description-turn', {
+            currentDescriberId: nextDescriberId,
+            endTime
+          });
+        }
+      }, 3500);
+      roomManager.addPendingCallback(room.id, timeout);
     });
 
     // 채팅 메시지
     socket.on('chat-message', (data: { message: string }) => {
       const room = roomManager.getRoomByPlayerId(socket.id);
-      if (!room) return;
+      if (!room) {
+        socket.emit('error', { message: '방을 찾을 수 없습니다.' });
+        return;
+      }
 
       const player = room.players.find(p => p.id === socket.id);
-      if (!player) return;
+      if (!player) {
+        socket.emit('error', { message: '플레이어 정보를 찾을 수 없습니다.' });
+        return;
+      }
 
       // 최후 변론 중에는 변론자만 채팅 가능
       if (room.state === 'defense' && room.game?.nominatedPlayerId !== socket.id) {
@@ -508,25 +540,26 @@ export function setupSocketHandlers(io: Server): void {
         const nominatedPlayerId = room.game.nominatedPlayerId;
         const liarId = room.game.liarId;
 
-        // 결과 브로드캐스트 (찬성/반대/무효 표 수 공개)
+        // 지목된 사람이 라이어인지 확인
+        const isLiar = nominatedPlayerId === liarId;
+
+        // 결과 브로드캐스트 (찬성/반대/무효 표 수 공개 + 라이어 여부)
         io.to(roomId).emit('final-vote-result', {
           agree: result.agree,
           disagree: result.disagree,
           abstain: result.abstain,
           confirmed: result.confirmed,
-          nominatedPlayerId
+          nominatedPlayerId,
+          isLiar: result.confirmed ? isLiar : null // 과반수 찬성 시에만 라이어 여부 공개
         });
 
-        // 5초 후 다음 단계로 진행
-        setTimeout(() => {
+        // 12초 후 다음 단계로 진행 (5초 카운트다운 + 4초 타이핑 + 3초 결과 대기)
+        const timeout = setTimeout(() => {
           // 방이 아직 유효한지 확인
           const currentRoom = roomManager.getRoom(roomId);
           if (!currentRoom || !currentRoom.game) return;
 
           if (result.confirmed) {
-            // 지목된 사람이 라이어인지 확인
-            const isLiar = nominatedPlayerId === liarId;
-
             if (isLiar) {
               // 라이어 정답 맞추기 단계
               currentRoom.startLiarGuess();
@@ -551,7 +584,9 @@ export function setupSocketHandlers(io: Server): void {
               discussionEndTime: currentRoom.game.discussionEndTime
             });
           }
-        }, 5000);
+        }, 12000);
+        // 방 삭제 시 자동 취소되도록 등록
+        roomManager.addPendingCallback(roomId, timeout);
       }
     });
 
@@ -568,25 +603,26 @@ export function setupSocketHandlers(io: Server): void {
       const nominatedPlayerId = room.game.nominatedPlayerId;
       const liarId = room.game.liarId;
 
-      // 결과 브로드캐스트 (찬성/반대/무효 표 수 공개)
+      // 지목된 사람이 라이어인지 확인
+      const isLiar = nominatedPlayerId === liarId;
+
+      // 결과 브로드캐스트 (찬성/반대/무효 표 수 공개 + 라이어 여부)
       io.to(roomId).emit('final-vote-result', {
         agree: result.agree,
         disagree: result.disagree,
         abstain: result.abstain,
         confirmed: result.confirmed,
-        nominatedPlayerId
+        nominatedPlayerId,
+        isLiar: result.confirmed ? isLiar : null // 과반수 찬성 시에만 라이어 여부 공개
       });
 
-      // 5초 후 다음 단계로 진행
-      setTimeout(() => {
+      // 12초 후 다음 단계로 진행 (5초 카운트다운 + 4초 타이핑 + 3초 결과 대기)
+      const timeout = setTimeout(() => {
         // 방이 아직 유효한지 확인
         const currentRoom = roomManager.getRoom(roomId);
         if (!currentRoom || !currentRoom.game) return;
 
         if (result.confirmed) {
-          // 지목된 사람이 라이어인지 확인
-          const isLiar = nominatedPlayerId === liarId;
-
           if (isLiar) {
             // 라이어 정답 맞추기 단계
             currentRoom.startLiarGuess();
@@ -611,7 +647,9 @@ export function setupSocketHandlers(io: Server): void {
             discussionEndTime: currentRoom.game.discussionEndTime
           });
         }
-      }, 5000);
+      }, 12000);
+      // 방 삭제 시 자동 취소되도록 등록
+      roomManager.addPendingCallback(roomId, timeout);
     });
 
     // 라이어 정답 맞추기

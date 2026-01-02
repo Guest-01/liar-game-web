@@ -4,6 +4,9 @@ const REDO_DESCRIPTION_ID = '__REDO_DESCRIPTION__';
 // 게임 방 Alpine.js 컴포넌트
 function gameRoom() {
   return {
+    // 초기화 상태 (중복 초기화 방지)
+    initialized: false,
+
     // 연결 상태
     socket: null,
     connecting: true,
@@ -44,6 +47,12 @@ function gameRoom() {
     chatInput: '',
     myNomination: null,
     nominations: {},
+    nominationPulse: {},  // 지목 수 애니메이션 트리거
+
+    resetNominations() {
+      this.nominations = {};
+      this.nominationPulse = {};
+    },
 
     // 모바일 채팅
     mobileChatOpen: false,
@@ -59,8 +68,15 @@ function gameRoom() {
     // 최종 투표
     myFinalVote: null,
     finalVoteCount: 0,
-    voteResult: null,  // { agree, disagree, confirmed, countdown }
+    voteResult: null,  // { agree, disagree, confirmed, countdown, isLiar }
     voteResultInterval: null,
+
+    // 라이어 공개 애니메이션
+    liarRevealPhase: 0,  // 0: 없음, 1: 타이핑 중, 2: "맞습니다!/아닙니다!"
+    liarRevealIsLiar: null,  // true/false
+    liarRevealText: '',  // 타이핑 중인 텍스트
+    liarRevealFullText: '',  // 전체 텍스트
+    liarRevealInterval: null,  // 타이핑 인터벌
 
     // 라이어 정답
     liarId: null,
@@ -68,6 +84,13 @@ function gameRoom() {
 
     // 결과
     gameResult: null,
+
+    // 타이핑 애니메이션
+    typingText: '',           // 현재 타이핑 중인 텍스트
+    typingFullText: '',       // 전체 텍스트
+    typingInterval: null,     // 타이핑 인터벌
+    typingPlayerId: null,     // 타이핑 중인 플레이어 ID
+    isTyping: false,          // 타이핑 중 여부
 
     // 타이머
     timer: 0,
@@ -92,6 +115,10 @@ function gameRoom() {
 
     // 초기화
     init() {
+      // 중복 초기화 방지
+      if (this.initialized) return;
+      this.initialized = true;
+
       // URL에서 닉네임 파라미터 확인
       const urlParams = new URLSearchParams(window.location.search);
       const nicknameParam = urlParams.get('nickname');
@@ -122,9 +149,9 @@ function gameRoom() {
 
         // 자동 참가 조건:
         // 1. 로비에서 온 경우 (nickname 파라미터 있음)
-        // 2. 방금 방을 만든 경우 (hostToken 파라미터 있음)
-        // 둘 다 localStorage에 유효한 닉네임이 있어야 함
-        const shouldAutoJoin = (urlParams.has('nickname') || urlParams.has('hostToken'))
+        // 2. 방금 방을 만든 경우 (hostToken이 sessionStorage에 있음)
+        const hostToken = sessionStorage.getItem(`hostToken_${window.ROOM_ID}`);
+        const shouldAutoJoin = (urlParams.has('nickname') || hostToken)
           && this.nickname
           && this.nickname.length >= 2;
 
@@ -136,6 +163,23 @@ function gameRoom() {
       this.socket.on('disconnect', () => {
         this.connecting = true;
       });
+
+      // 소켓 이벤트 핸들러 등록
+      this.setupSocketHandlers();
+    },
+
+    // 소켓 이벤트 핸들러 등록 (중복 등록 방지를 위해 분리)
+    setupSocketHandlers() {
+      // 기존 핸들러 제거 후 재등록 (connect, disconnect 제외)
+      const events = [
+        'room-joined', 'player-joined', 'player-left', 'kicked', 'player-kicked',
+        'game-started', 'room-state-update', 'description-phase-start', 'description-turn',
+        'description-submitted', 'discussion-start', 'chat-message', 'nomination-update',
+        'all-nominated', 'tie-detected', 'defense-start', 'final-vote-start',
+        'final-vote-update', 'final-vote-result', 'restart-discussion', 'liar-guess-phase',
+        'game-end', 'room-settings-updated', 'game-reset', 'game-interrupted', 'error'
+      ];
+      events.forEach(event => this.socket.off(event));
 
       // 방 참가 완료
       this.socket.on('room-joined', (data) => {
@@ -188,7 +232,7 @@ function gameRoom() {
         this.descriptions = {};
         this.addSystemMessage('게임이 시작되었습니다');
         this.myNomination = null;
-        this.nominations = {};
+        this.resetNominations();
         this.myFinalVote = null;
         this.gameResult = null;
       });
@@ -202,6 +246,12 @@ function gameRoom() {
 
       // 한줄 설명 시작
       this.socket.on('description-phase-start', (data) => {
+        // 방어 코드: order가 유효한지 확인
+        if (!data.order || !Array.isArray(data.order) || data.order.length === 0) {
+          console.error('Invalid description order received:', data.order);
+          return;
+        }
+
         this.descriptionOrder = data.order;
         this.currentDescriberIndex = 0;
         this.myDescriptionSubmitted = false;
@@ -210,7 +260,7 @@ function gameRoom() {
 
         // 기존 데이터 초기화 (한줄 설명 다시하기 시)
         this.descriptions = {};
-        this.nominations = {};
+        this.resetNominations();
         this.myNomination = null;
 
         // 애니메이션 중 토론 UI 숨기기
@@ -257,6 +307,11 @@ function gameRoom() {
 
       // 설명 차례
       this.socket.on('description-turn', (data) => {
+        // 방어 코드: descriptionOrder가 유효한지 확인
+        if (!this.descriptionOrder || !Array.isArray(this.descriptionOrder)) {
+          console.error('Description order not initialized');
+          return;
+        }
         const idx = this.descriptionOrder.findIndex(id => id === data.currentDescriberId);
         this.currentDescriberIndex = idx >= 0 ? idx : this.currentDescriberIndex + 1;
         this.startTimer(data.endTime);
@@ -270,15 +325,27 @@ function gameRoom() {
 
       // 설명 제출됨
       this.socket.on('description-submitted', (data) => {
-        this.descriptions[data.playerId] = data.description;
         if (data.playerId === this.playerId) {
           this.myDescriptionSubmitted = true;
         }
+
+        // 타이핑 애니메이션 시작 (2초 후 descriptions에 추가)
+        this.startTypingAnimation(data.playerId, data.description);
       });
 
       // 토론 시작
       this.socket.on('discussion-start', (data) => {
         this.room.state = 'discussion';
+        // 타이핑 애니메이션 정리
+        if (this.typingInterval) {
+          clearInterval(this.typingInterval);
+          this.typingInterval = null;
+        }
+        this.isTyping = false;
+        this.typingText = '';
+        this.typingPlayerId = null;
+        this.typingFullText = '';
+        // 서버에서 받은 전체 설명 목록으로 교체
         this.descriptions = data.descriptions;
         this.startTimer(data.endTime);
         // 채팅 입력창에 포커스
@@ -309,6 +376,29 @@ function gameRoom() {
 
       // 지목 현황
       this.socket.on('nomination-update', (data) => {
+        // 지목 수 증가 감지 및 애니메이션 트리거
+        const oldCounts = {};
+        const newCounts = {};
+
+        // 이전 지목 수 계산
+        Object.values(this.nominations).forEach(id => {
+          oldCounts[id] = (oldCounts[id] || 0) + 1;
+        });
+        // 새 지목 수 계산
+        Object.values(data.nominations).forEach(id => {
+          newCounts[id] = (newCounts[id] || 0) + 1;
+        });
+
+        // 증가한 항목에 애니메이션 트리거
+        Object.keys(newCounts).forEach(id => {
+          if ((newCounts[id] || 0) > (oldCounts[id] || 0)) {
+            this.nominationPulse[id] = true;
+            setTimeout(() => {
+              this.nominationPulse[id] = false;
+            }, 300);
+          }
+        });
+
         this.nominations = data.nominations;
       });
 
@@ -322,7 +412,7 @@ function gameRoom() {
         showToast('동점입니다! 다시 토론합니다.');
         this.room.state = 'discussion';
         this.myNomination = null;
-        this.nominations = {};
+        this.resetNominations();
         this.startTimer(data.endTime);
       });
 
@@ -357,23 +447,33 @@ function gameRoom() {
         // 타이머 정지
         this.stopTimer();
 
+        // 라이어 공개 애니메이션 초기화
+        this.liarRevealPhase = 0;
+        this.liarRevealIsLiar = data.isLiar;
+
         this.voteResult = {
           agree: data.agree,
           disagree: data.disagree,
           abstain: data.abstain,
           confirmed: data.confirmed,
           nominatedPlayerId: data.nominatedPlayerId,
+          isLiar: data.isLiar,
           countdown: 5
         };
 
-        // 5초 카운트다운
+        // 5초 카운트다운 (1초 후에 감소 시작하여 5초 모두 표시)
         this.voteResultInterval = setInterval(() => {
-          if (this.voteResult && this.voteResult.countdown > 0) {
+          if (this.voteResult && this.voteResult.countdown > 1) {
             this.voteResult.countdown--;
-          }
-          if (this.voteResult && this.voteResult.countdown <= 0) {
+          } else if (this.voteResult && this.voteResult.countdown === 1) {
+            this.voteResult.countdown = 0;
             clearInterval(this.voteResultInterval);
             this.voteResultInterval = null;
+
+            // 과반수 찬성 시 라이어 공개 애니메이션 시작
+            if (this.voteResult.confirmed && this.voteResult.isLiar !== null) {
+              this.startLiarRevealAnimation();
+            }
           }
         }, 1000);
       });
@@ -383,7 +483,7 @@ function gameRoom() {
         this.room.state = 'discussion';
         // 지목 데이터 초기화
         this.myNomination = null;
-        this.nominations = {};
+        this.resetNominations();
         this.defenderId = null;
         // 투표 데이터 초기화
         this.myFinalVote = null;
@@ -464,10 +564,12 @@ function gameRoom() {
 
       localStorage.setItem('nickname', this.nickname);
 
-      // URL 파라미터에서 비밀번호, 호스트 토큰 확인
+      // URL 파라미터에서 비밀번호 확인
       const urlParams = new URLSearchParams(window.location.search);
       const password = this.passwordInput || urlParams.get('password') || undefined;
-      const hostToken = urlParams.get('hostToken') || undefined;
+
+      // hostToken은 sessionStorage에서 가져옴 (URL에 노출하지 않음)
+      const hostToken = sessionStorage.getItem(`hostToken_${window.ROOM_ID}`) || undefined;
 
       this.socket.emit('join-room', {
         roomId: window.ROOM_ID,
@@ -475,6 +577,11 @@ function gameRoom() {
         password,
         hostToken
       });
+
+      // 사용 후 hostToken 삭제
+      if (hostToken) {
+        sessionStorage.removeItem(`hostToken_${window.ROOM_ID}`);
+      }
     },
 
     // 방 나가기
@@ -613,11 +720,140 @@ function gameRoom() {
       this.descriptions = {};
       this.addSystemMessage('대기실로 돌아왔습니다');
       this.myNomination = null;
-      this.nominations = {};
+      this.resetNominations();
       this.myFinalVote = null;
       this.gameResult = null;
       this.myDescriptionSubmitted = false;
+      this.liarRevealPhase = 0;
+      this.liarRevealIsLiar = null;
+      this.liarRevealText = '';
+      this.liarRevealFullText = '';
+      if (this.liarRevealInterval) {
+        clearInterval(this.liarRevealInterval);
+        this.liarRevealInterval = null;
+      }
       this.stopTimer();
+    },
+
+    // Alpine.js destroy 훅 - 리소스 정리
+    destroy() {
+      this.cleanup();
+    },
+
+    // 라이어 공개 애니메이션 시작
+    startLiarRevealAnimation() {
+      const nickname = this.getPlayerNickname(this.voteResult?.nominatedPlayerId);
+      this.liarRevealFullText = `${nickname}님은 라이어가...`;
+      this.liarRevealText = '';
+      this.liarRevealPhase = 1;
+
+      // 단계별 타이핑: "ㅇㅇㅇ님은" → 휴식 → " 라이어가..." → 휴식 → Phase 2
+      const part1 = `${nickname}님은`;
+      const part2 = ` 라이어가...`;
+
+      const typeText = (text, onComplete) => {
+        const chars = text.split('');
+        let charIndex = 0;
+        const intervalTime = 1000 / chars.length; // 1초 동안 타이핑
+
+        this.liarRevealInterval = setInterval(() => {
+          if (charIndex < chars.length) {
+            this.liarRevealText += chars[charIndex];
+            charIndex++;
+          } else {
+            clearInterval(this.liarRevealInterval);
+            this.liarRevealInterval = null;
+            onComplete();
+          }
+        }, intervalTime);
+      };
+
+      // Part 1: "홍길동님은" 타이핑
+      typeText(part1, () => {
+        // 0.5초 휴식 후 Part 2
+        setTimeout(() => {
+          typeText(part2, () => {
+            // 1.5초 휴식 후 Phase 2
+            setTimeout(() => {
+              this.liarRevealPhase = 2;
+            }, 1500);
+          });
+        }, 500);
+      });
+    },
+
+    // 리소스 정리 (타이머, 소켓 등)
+    cleanup() {
+      // 모든 타이머 정리
+      this.stopTimer();
+      if (this.previewTimeout) {
+        clearTimeout(this.previewTimeout);
+        this.previewTimeout = null;
+      }
+      if (this.voteResultInterval) {
+        clearInterval(this.voteResultInterval);
+        this.voteResultInterval = null;
+      }
+      if (this.typingInterval) {
+        clearInterval(this.typingInterval);
+        this.typingInterval = null;
+      }
+      if (this.liarRevealInterval) {
+        clearInterval(this.liarRevealInterval);
+        this.liarRevealInterval = null;
+      }
+      // 소켓 정리
+      if (this.socket) {
+        this.socket.off();
+        this.socket.disconnect();
+        this.socket = null;
+      }
+      this.initialized = false;
+    },
+
+    // 타이핑 애니메이션 시작 (2초간 표시 후 descriptions에 추가)
+    startTypingAnimation(playerId, description) {
+      // 이전 애니메이션 정리
+      if (this.typingInterval) {
+        clearInterval(this.typingInterval);
+        // 이전 타이핑이 있었다면 즉시 완료 처리
+        if (this.typingPlayerId && this.typingFullText) {
+          this.descriptions[this.typingPlayerId] = this.typingFullText;
+        }
+      }
+
+      this.typingPlayerId = playerId;
+      this.typingFullText = description;
+      this.typingText = '';
+      this.isTyping = true;
+
+      let charIndex = 0;
+      const totalChars = description.length;
+      // 글자당 100ms 고정 속도, 총 3초 내에서 남은 시간은 대기
+      const charInterval = 100;
+      const totalAnimTime = 3000;
+      const typingTime = totalChars * charInterval;
+      const pauseTime = Math.max(500, totalAnimTime - typingTime);
+
+      this.typingInterval = setInterval(() => {
+        if (charIndex < totalChars) {
+          this.typingText = description.substring(0, charIndex + 1);
+          charIndex++;
+        } else {
+          // 타이핑 완료
+          clearInterval(this.typingInterval);
+          this.typingInterval = null;
+
+          // 남은 시간 대기 후 descriptions에 추가하고 타이핑 상태 초기화
+          setTimeout(() => {
+            this.descriptions[playerId] = description;
+            this.isTyping = false;
+            this.typingText = '';
+            this.typingPlayerId = null;
+            this.typingFullText = '';
+          }, pauseTime);
+        }
+      }, charInterval);
     },
 
     // 시스템 메시지 추가
