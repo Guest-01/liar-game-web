@@ -110,10 +110,13 @@ function createRoomForm() {
       });
 
       socket.on('room-created', (data) => {
-        let url = '/room/' + data.roomId + '?hostToken=' + encodeURIComponent(data.hostToken);
-        // 비공개 방인 경우 비밀번호도 전달
+        // hostToken을 sessionStorage에 저장 (URL에 노출하지 않음)
+        sessionStorage.setItem(`hostToken_${data.roomId}`, data.hostToken);
+
+        let url = '/room/' + data.roomId;
+        // 비공개 방인 경우 비밀번호만 전달
         if (!this.isPublic && this.password) {
-          url += '&password=' + encodeURIComponent(this.password);
+          url += '?password=' + encodeURIComponent(this.password);
         }
         window.location.href = url;
       });

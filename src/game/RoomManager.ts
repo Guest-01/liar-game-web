@@ -8,6 +8,21 @@ export class RoomManager {
   private playerToRoom: Map<string, string> = new Map(); // playerId -> roomId
   private pendingDeletions: Map<string, NodeJS.Timeout> = new Map(); // roomId -> timeout
   private hostTokens: Map<string, string> = new Map(); // roomId -> hostToken
+  private pendingCallbacks: Map<string, NodeJS.Timeout[]> = new Map(); // roomId -> timeouts
+
+  // 방에 연결된 타이머 추가 (방 삭제 시 자동 취소)
+  addPendingCallback(roomId: string, timeout: NodeJS.Timeout): void {
+    const existing = this.pendingCallbacks.get(roomId) || [];
+    existing.push(timeout);
+    this.pendingCallbacks.set(roomId, existing);
+  }
+
+  // 방에 연결된 모든 타이머 취소
+  private clearPendingCallbacks(roomId: string): void {
+    const timeouts = this.pendingCallbacks.get(roomId) || [];
+    timeouts.forEach(t => clearTimeout(t));
+    this.pendingCallbacks.delete(roomId);
+  }
 
   // 방 생성 (플레이어 추가 없이 방만 생성, hostToken 반환)
   createRoom(
@@ -137,8 +152,15 @@ export class RoomManager {
 
     // 방에 아무도 없으면 5초 후 삭제 (리다이렉트 대기)
     if (room.players.length === 0) {
+      // 기존 삭제 타이머가 있으면 먼저 취소
+      const existingTimeout = this.pendingDeletions.get(roomId);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
       const timeout = setTimeout(() => {
         if (room.players.length === 0) {
+          this.clearPendingCallbacks(roomId);
           this.rooms.delete(roomId);
           this.hostTokens.delete(roomId);
           this.pendingDeletions.delete(roomId);
@@ -195,6 +217,8 @@ export class RoomManager {
           clearTimeout(pendingTimeout);
           this.pendingDeletions.delete(id);
         }
+        // 방에 연결된 게임 콜백 취소
+        this.clearPendingCallbacks(id);
         this.hostTokens.delete(id);
         this.rooms.delete(id);
         cleaned++;

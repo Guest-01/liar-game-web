@@ -201,7 +201,12 @@ export class GameRoom implements Room {
   // 현재 설명 차례인 플레이어 ID
   getCurrentDescriberId(): string | null {
     if (!this.game || this.state !== 'description') return null;
-    return this.game.descriptionOrder[this.game.currentDescriberIndex] || null;
+    const { descriptionOrder, currentDescriberIndex } = this.game;
+    // 명시적 범위 체크
+    if (currentDescriberIndex < 0 || currentDescriberIndex >= descriptionOrder.length) {
+      return null;
+    }
+    return descriptionOrder[currentDescriberIndex];
   }
 
   // 설명 제출
@@ -252,13 +257,19 @@ export class GameRoom implements Room {
   calculateNominationResult(): { winnerId: string | null; isTie: boolean; tiedPlayerIds: string[] } {
     if (!this.game) return { winnerId: null, isTie: false, tiedPlayerIds: [] };
 
-    const votes: Record<string, number> = {};
+    const nominations = Object.values(this.game.nominations);
+    // 아무도 지목하지 않은 경우 명시적 처리
+    if (nominations.length === 0) {
+      return { winnerId: null, isTie: false, tiedPlayerIds: [] };
+    }
 
-    for (const targetId of Object.values(this.game.nominations)) {
+    const votes: Record<string, number> = {};
+    for (const targetId of nominations) {
       votes[targetId] = (votes[targetId] || 0) + 1;
     }
 
-    const maxVotes = Math.max(...Object.values(votes), 0);
+    const voteValues = Object.values(votes);
+    const maxVotes = Math.max(...voteValues);  // 이제 빈 배열 아님
     if (maxVotes === 0) return { winnerId: null, isTie: false, tiedPlayerIds: [] };
 
     const topVoted = Object.entries(votes)
@@ -391,6 +402,15 @@ export class GameRoom implements Room {
     return true;
   }
 
+  // 단어 정규화 (비교용)
+  private normalizeWord(word: string): string {
+    return word
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '')   // 모든 공백 제거
+      .normalize('NFC');      // 유니코드 정규화 (한글)
+  }
+
   // 게임 결과 계산
   getGameResult(): {
     winner: 'citizen' | 'liar';
@@ -406,7 +426,7 @@ export class GameRoom implements Room {
 
     const wasLiarCaught = this.game.nominatedPlayerId === this.game.liarId;
     const liarGuessedCorrectly =
-      this.game.liarGuess?.toLowerCase().trim() === this.game.citizenWord.toLowerCase().trim();
+      this.normalizeWord(this.game.liarGuess || '') === this.normalizeWord(this.game.citizenWord);
 
     let winner: 'citizen' | 'liar';
     if (wasLiarCaught) {
