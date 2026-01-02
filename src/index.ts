@@ -102,7 +102,7 @@ setInterval(() => {
 
 // 서버 시작
 httpServer.listen(PORT, () => {
-  logger.info({ port: PORT }, `🎮 라이어 게임 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+  logger.info({ port: PORT, version }, `🎮 라이어 게임 v${version} 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
 });
 
 // Graceful shutdown

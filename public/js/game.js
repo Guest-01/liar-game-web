@@ -248,7 +248,6 @@ function gameRoom() {
       this.socket.on('description-phase-start', (data) => {
         // 방어 코드: order가 유효한지 확인
         if (!data.order || !Array.isArray(data.order) || data.order.length === 0) {
-          console.error('Invalid description order received:', data.order);
           return;
         }
 
@@ -309,7 +308,6 @@ function gameRoom() {
       this.socket.on('description-turn', (data) => {
         // 방어 코드: descriptionOrder가 유효한지 확인
         if (!this.descriptionOrder || !Array.isArray(this.descriptionOrder)) {
-          console.error('Description order not initialized');
           return;
         }
         const idx = this.descriptionOrder.findIndex(id => id === data.currentDescriberId);
