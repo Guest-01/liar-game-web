@@ -197,6 +197,7 @@
                 x-model="joinModal.password"
                 x-ref="passwordInput"
                 placeholder="비밀번호"
+                autocomplete="new-password"
                 class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary outline-none"
               >
             </div>
@@ -316,6 +317,13 @@ function lobbyData() {
       loading: false
     },
 
+    destroy() {
+      if (this.socket) {
+        this.socket.disconnect();
+        this.socket = null;
+      }
+    },
+
     init() {
       // 초기 렌더링 후 Lucide 아이콘 생성
       this.$nextTick(() => lucide.createIcons());
@@ -337,11 +345,13 @@ function lobbyData() {
       this.socket.on('verify-join-result', (data) => {
         this.joinModal.loading = false;
         if (data.success) {
-          // 검증 성공: 페이지 이동
+          // 검증 성공: 비밀번호를 sessionStorage에 저장 후 페이지 이동
           localStorage.setItem('nickname', this.joinModal.nickname);
+          if (this.joinModal.password) {
+            sessionStorage.setItem(`roomPassword_${this.joinModal.roomId}`, this.joinModal.password);
+          }
           const url = '/room/' + this.joinModal.roomId +
-            '?nickname=' + encodeURIComponent(this.joinModal.nickname) +
-            '&password=' + encodeURIComponent(this.joinModal.password);
+            '?nickname=' + encodeURIComponent(this.joinModal.nickname);
           window.location.href = url;
         } else {
           // 검증 실패: 에러 표시

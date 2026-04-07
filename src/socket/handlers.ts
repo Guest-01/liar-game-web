@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { roomManager } from '../game/RoomManager';
+import { GameRoom } from '../game/Room';
 import { GameMode, REDO_DESCRIPTION_ID } from '../game/types';
 import logger from '../logger';
 
@@ -22,6 +23,54 @@ const pendingJoins = new Set<string>();
 function broadcastLobbyUpdate(io: Server): void {
   const rooms = roomManager.getLobbyRooms();
   io.to('lobby').emit('lobby-rooms', { rooms });
+}
+
+// 최종 투표 결과 처리 (final-vote / final-vote-timeout 공통)
+function processFinalVoteResult(io: Server, room: GameRoom): void {
+  if (!room.game) return;
+  const result = room.calculateFinalVoteResult();
+  const roomId = room.id;
+  const nominatedPlayerId = room.game.nominatedPlayerId;
+  const liarId = room.game.liarId;
+  const isLiar = nominatedPlayerId === liarId;
+
+  io.to(roomId).emit('final-vote-result', {
+    agree: result.agree,
+    disagree: result.disagree,
+    abstain: result.abstain,
+    confirmed: result.confirmed,
+    nominatedPlayerId,
+    isLiar: result.confirmed ? isLiar : null
+  });
+
+  const timeout = setTimeout(() => {
+    const currentRoom = roomManager.getRoom(roomId);
+    if (!currentRoom || !currentRoom.game) return;
+
+    if (result.confirmed) {
+      if (isLiar) {
+        currentRoom.startLiarGuess();
+        io.to(roomId).emit('liar-guess-phase', {
+          liarId: currentRoom.game.liarId,
+          endTime: currentRoom.game.liarGuessEndTime
+        });
+      } else {
+        currentRoom.goToResult();
+        const gameResult = currentRoom.getGameResult();
+        if (gameResult) {
+          io.to(roomId).emit('game-end', gameResult);
+          logger.info({ roomId, winner: gameResult.winner }, `게임 종료 | ${roomId} | 승자: ${gameResult.winner}`);
+        }
+      }
+    } else {
+      currentRoom.restartDiscussion();
+      io.to(roomId).emit('restart-discussion', {
+        reason: 'vote-failed',
+        discussionEndTime: currentRoom.game.discussionEndTime
+      });
+    }
+  }, 12000);
+  roomManager.addPendingCallback(roomId, timeout);
 }
 
 export function setupSocketHandlers(io: Server): void {
@@ -535,58 +584,7 @@ export function setupSocketHandlers(io: Server): void {
 
       // 모두 투표했는지 확인
       if (room.allFinalVoted()) {
-        const result = room.calculateFinalVoteResult();
-        const roomId = room.id;
-        const nominatedPlayerId = room.game.nominatedPlayerId;
-        const liarId = room.game.liarId;
-
-        // 지목된 사람이 라이어인지 확인
-        const isLiar = nominatedPlayerId === liarId;
-
-        // 결과 브로드캐스트 (찬성/반대/무효 표 수 공개 + 라이어 여부)
-        io.to(roomId).emit('final-vote-result', {
-          agree: result.agree,
-          disagree: result.disagree,
-          abstain: result.abstain,
-          confirmed: result.confirmed,
-          nominatedPlayerId,
-          isLiar: result.confirmed ? isLiar : null // 과반수 찬성 시에만 라이어 여부 공개
-        });
-
-        // 12초 후 다음 단계로 진행 (5초 카운트다운 + 4초 타이핑 + 3초 결과 대기)
-        const timeout = setTimeout(() => {
-          // 방이 아직 유효한지 확인
-          const currentRoom = roomManager.getRoom(roomId);
-          if (!currentRoom || !currentRoom.game) return;
-
-          if (result.confirmed) {
-            if (isLiar) {
-              // 라이어 정답 맞추기 단계
-              currentRoom.startLiarGuess();
-              io.to(roomId).emit('liar-guess-phase', {
-                liarId: currentRoom.game.liarId,
-                endTime: currentRoom.game.liarGuessEndTime
-              });
-            } else {
-              // 틀림 - 라이어 승리
-              currentRoom.goToResult();
-              const gameResult = currentRoom.getGameResult();
-              if (gameResult) {
-                io.to(roomId).emit('game-end', gameResult);
-                logger.info({ roomId, winner: gameResult.winner }, `게임 종료 | ${roomId} | 승자: ${gameResult.winner}`);
-              }
-            }
-          } else {
-            // 과반수 미달 - 토론 단계로 복귀
-            currentRoom.restartDiscussion();
-            io.to(roomId).emit('restart-discussion', {
-              reason: 'vote-failed',
-              discussionEndTime: currentRoom.game.discussionEndTime
-            });
-          }
-        }, 12000);
-        // 방 삭제 시 자동 취소되도록 등록
-        roomManager.addPendingCallback(roomId, timeout);
+        processFinalVoteResult(io, room);
       }
     });
 
@@ -598,58 +596,7 @@ export function setupSocketHandlers(io: Server): void {
       // 호스트만 처리
       if (room.hostId !== socket.id) return;
 
-      const result = room.calculateFinalVoteResult();
-      const roomId = room.id;
-      const nominatedPlayerId = room.game.nominatedPlayerId;
-      const liarId = room.game.liarId;
-
-      // 지목된 사람이 라이어인지 확인
-      const isLiar = nominatedPlayerId === liarId;
-
-      // 결과 브로드캐스트 (찬성/반대/무효 표 수 공개 + 라이어 여부)
-      io.to(roomId).emit('final-vote-result', {
-        agree: result.agree,
-        disagree: result.disagree,
-        abstain: result.abstain,
-        confirmed: result.confirmed,
-        nominatedPlayerId,
-        isLiar: result.confirmed ? isLiar : null // 과반수 찬성 시에만 라이어 여부 공개
-      });
-
-      // 12초 후 다음 단계로 진행 (5초 카운트다운 + 4초 타이핑 + 3초 결과 대기)
-      const timeout = setTimeout(() => {
-        // 방이 아직 유효한지 확인
-        const currentRoom = roomManager.getRoom(roomId);
-        if (!currentRoom || !currentRoom.game) return;
-
-        if (result.confirmed) {
-          if (isLiar) {
-            // 라이어 정답 맞추기 단계
-            currentRoom.startLiarGuess();
-            io.to(roomId).emit('liar-guess-phase', {
-              liarId: currentRoom.game.liarId,
-              endTime: currentRoom.game.liarGuessEndTime
-            });
-          } else {
-            // 틀림 - 라이어 승리
-            currentRoom.goToResult();
-            const gameResult = currentRoom.getGameResult();
-            if (gameResult) {
-              io.to(roomId).emit('game-end', gameResult);
-              logger.info({ roomId, winner: gameResult.winner }, `게임 종료 | ${roomId} | 승자: ${gameResult.winner}`);
-            }
-          }
-        } else {
-          // 과반수 미달 - 토론 단계로 복귀
-          currentRoom.restartDiscussion();
-          io.to(roomId).emit('restart-discussion', {
-            reason: 'vote-failed',
-            discussionEndTime: currentRoom.game.discussionEndTime
-          });
-        }
-      }, 12000);
-      // 방 삭제 시 자동 취소되도록 등록
-      roomManager.addPendingCallback(roomId, timeout);
+      processFinalVoteResult(io, room);
     });
 
     // 라이어 정답 맞추기

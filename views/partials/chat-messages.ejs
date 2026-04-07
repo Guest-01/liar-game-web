@@ -1,4 +1,4 @@
-<template x-for="msg in chatMessages" :key="msg.timestamp">
+<template x-for="(msg, msgIndex) in chatMessages" :key="msg.timestamp + '_' + msgIndex">
   <div class="text-sm">
     <template x-if="msg.isSystem">
       <div class="text-center text-gray-500 py-1 border-t border-b border-gray-700 my-2" x-text="msg.message"></div>

@@ -75,8 +75,13 @@ export function getRandomWords(categoryName: string): { citizen: string; liar: s
     return null;
   }
 
-  const shuffled = [...category.words].sort(() => Math.random() - 0.5);
-  return { citizen: shuffled[0], liar: shuffled[1] };
+  // Fisher-Yates 셔플로 첫 2개 단어 선택
+  const words = [...category.words];
+  for (let i = words.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [words[i], words[j]] = [words[j], words[i]];
+  }
+  return { citizen: words[0], liar: words[1] };
 }
 
 export function getCategoryNames(): string[] {

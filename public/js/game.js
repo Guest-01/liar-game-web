@@ -562,9 +562,8 @@ function gameRoom() {
 
       localStorage.setItem('nickname', this.nickname);
 
-      // URL 파라미터에서 비밀번호 확인
-      const urlParams = new URLSearchParams(window.location.search);
-      const password = this.passwordInput || urlParams.get('password') || undefined;
+      // sessionStorage에서 비밀번호 확인 (URL에 노출하지 않음)
+      const password = this.passwordInput || sessionStorage.getItem(`roomPassword_${window.ROOM_ID}`) || undefined;
 
       // hostToken은 sessionStorage에서 가져옴 (URL에 노출하지 않음)
       const hostToken = sessionStorage.getItem(`hostToken_${window.ROOM_ID}`) || undefined;
@@ -576,7 +575,8 @@ function gameRoom() {
         hostToken
       });
 
-      // 사용 후 hostToken 삭제
+      // 사용 후 sessionStorage 정리
+      sessionStorage.removeItem(`roomPassword_${window.ROOM_ID}`);
       if (hostToken) {
         sessionStorage.removeItem(`hostToken_${window.ROOM_ID}`);
       }

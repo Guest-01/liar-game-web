@@ -52,6 +52,7 @@
           placeholder="비밀번호를 입력하세요"
           minlength="1"
           maxlength="20"
+          autocomplete="new-password"
           :required="!isPublic"
           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
         >
@@ -110,20 +111,19 @@ function createRoomForm() {
       });
 
       socket.on('room-created', (data) => {
-        // hostToken을 sessionStorage에 저장 (URL에 노출하지 않음)
+        // hostToken과 비밀번호를 sessionStorage에 저장 (URL에 노출하지 않음)
         sessionStorage.setItem(`hostToken_${data.roomId}`, data.hostToken);
-
-        let url = '/room/' + data.roomId;
-        // 비공개 방인 경우 비밀번호만 전달
         if (!this.isPublic && this.password) {
-          url += '?password=' + encodeURIComponent(this.password);
+          sessionStorage.setItem(`roomPassword_${data.roomId}`, this.password);
         }
-        window.location.href = url;
+        socket.disconnect();
+        window.location.href = '/room/' + data.roomId;
       });
 
       socket.on('error', (data) => {
         this.error = data.message;
         this.loading = false;
+        socket.disconnect();
       });
     }
   }
