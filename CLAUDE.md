@@ -9,12 +9,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev      # 개발 서버 실행 (tsx watch)
-npm run build    # TypeScript 빌드
-npm start        # 프로덕션 서버 실행
+npm run dev        # 개발 서버 실행 (tsx watch)
+npm run build      # TypeScript 빌드
+npm start          # 프로덕션 서버 실행
+npm test           # 전체 테스트 실행 (vitest run)
+npm run test:watch # 파일 변경 시 자동 재실행 (vitest)
+npx vitest run src/game/Room.test.ts           # 단일 파일 실행
+npx vitest run -t "calculateNominationResult"  # 특정 테스트명으로 필터
 ```
 
-테스트/린트 설정 없음.
+린트 설정 없음.
 
 ## Architecture
 
@@ -59,6 +63,13 @@ npm start        # 프로덕션 서버 실행
 3. **로비 실시간 업데이트**: 소켓 room `'lobby'`에 join한 클라이언트에 `broadcastLobbyUpdate()`로 방 목록 변경 푸시.
 4. **호스트 토큰**: 방 생성 시 `nanoid`로 일회용 토큰 발급 → `sessionStorage`에 저장 → 첫 참가 시 전송하여 호스트 권한 획득.
 5. **저장소**: 닉네임은 `localStorage`, 호스트 토큰은 `sessionStorage` 사용.
+
+### Testing
+
+- **Framework**: Vitest (설정: `vitest.config.ts`)
+- **테스트 위치**: 소스 파일 옆에 배치 (`Room.test.ts`, `RoomManager.test.ts`, `gameFlow.test.ts`)
+- **범위**: `src/game/` 내 게임 로직 유닛 테스트 + 전체 게임 플로우 통합 테스트. Socket 핸들러(`handlers.ts`)와 클라이언트(`game.js`)는 테스트 범위 밖.
+- **타이머 테스트**: RoomManager 테스트에서 `vi.useFakeTimers()` 사용. 방 자동 삭제(5초), 비활성 정리(1시간) 등 타이머 의존 로직은 fake timer로 검증.
 
 ### Environment Variables
 - `PORT` (기본: 3000)
