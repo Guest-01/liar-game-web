@@ -24,12 +24,15 @@
 <!-- Tailwind CSS -->
 <link rel="stylesheet" href="/css/tailwind.css">
 
-<!-- Alpine.js + Collapse Plugin -->
-<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.15.11/dist/cdn.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.11/dist/cdn.min.js"></script>
-
 <!-- Socket.IO -->
 <script defer src="/socket.io/socket.io<%= isProd ? '.min' : '' %>.js"></script>
+
+<!-- Lucide Icons -->
+<script defer src="https://unpkg.com/lucide@1.7.0"></script>
+
+<!-- Alpine.js + Collapse Plugin (Socket.IO, Lucide 이후에 로드되어야 함) -->
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.15.11/dist/cdn.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.11/dist/cdn.min.js"></script>
 
 <style>
   [x-cloak] { display: none !important; }
