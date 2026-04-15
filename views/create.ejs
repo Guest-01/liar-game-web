@@ -4,7 +4,7 @@
   <%- include('partials/head') %>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
-<div class="container mx-auto px-4 py-8 max-w-lg">
+<main class="container mx-auto px-4 py-8 max-w-lg">
   <a href="/" class="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors">
     <- 로비로 돌아가기
   </a>
@@ -22,7 +22,7 @@
           placeholder="방 이름을 입력하세요"
           maxlength="20"
           required
-          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-hidden transition-all"
         >
       </div>
 
@@ -54,7 +54,7 @@
           maxlength="20"
           autocomplete="new-password"
           :required="!isPublic"
-          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+          class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-hidden transition-all"
         >
         <p class="text-xs text-gray-500 mt-1">참가자가 방에 들어올 때 입력해야 합니다</p>
       </div>
@@ -75,7 +75,7 @@
       </button>
     </form>
   </div>
-</div>
+</main>
 
 <script>
 function createRoomForm() {
