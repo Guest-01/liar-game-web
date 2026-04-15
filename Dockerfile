@@ -25,6 +25,7 @@ COPY --from=builder /app/dist ./dist
 
 # 정적 파일 복사 (웹 앱 전용)
 COPY public ./public
+COPY --from=builder /app/public/css/tailwind.css ./public/css/tailwind.css
 COPY views ./views
 
 # 서버 실행

@@ -16,7 +16,7 @@
 
   <!-- 플로팅 버튼 -->
   <button @click="openMobileChat()"
-    class="w-14 h-14 bg-primary hover:bg-primary/80 rounded-full shadow-lg flex items-center justify-center relative transition-transform active:scale-95 flex-shrink-0"
+    class="w-14 h-14 bg-primary hover:bg-primary/80 rounded-full shadow-lg flex items-center justify-center relative transition-transform active:scale-95 shrink-0"
     x-transition:enter="transition ease-out duration-200"
     x-transition:enter-start="opacity-0 scale-90"
     x-transition:enter-end="opacity-100 scale-100">
@@ -45,14 +45,14 @@
     :class="{ 'open': mobileChatOpen && !mobileChatClosing, 'closing': mobileChatClosing }">
 
     <!-- 드래그 핸들 (스와이프 영역) -->
-    <div class="flex justify-center py-3 flex-shrink-0 cursor-grab active:cursor-grabbing"
+    <div class="flex justify-center py-3 shrink-0 cursor-grab active:cursor-grabbing"
       @touchstart="handleSwipeStart($event)"
       @touchend="handleSwipeEnd($event)">
       <div class="w-12 h-1.5 bg-gray-600 rounded-full"></div>
     </div>
 
     <!-- 헤더 -->
-    <div class="flex justify-between items-center px-4 pb-2 flex-shrink-0">
+    <div class="flex justify-between items-center px-4 pb-2 shrink-0">
       <h3 class="font-semibold flex items-center gap-2 text-sm">
         <i data-lucide="message-square" class="w-4 h-4"></i> 채팅
       </h3>
@@ -67,7 +67,7 @@
     </div>
 
     <!-- 입력 폼 -->
-    <div class="p-4 flex-shrink-0 pb-safe">
+    <div class="p-4 shrink-0 pb-safe">
       <form @submit.prevent="sendChat()" class="flex gap-2"
         x-show="room.state !== 'defense' || defenderId === playerId">
         <input
@@ -75,7 +75,7 @@
           x-model="chatInput"
           placeholder="메시지"
           maxlength="200"
-          class="flex-1 min-w-0 px-3 py-2 bg-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
+          class="flex-1 min-w-0 px-3 py-2 bg-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-hidden"
         >
         <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary/80 rounded-lg text-sm transition-colors">전송</button>
       </form>

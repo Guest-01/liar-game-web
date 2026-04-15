@@ -14,6 +14,7 @@ const app = express();
 // 모든 뷰에서 사용할 수 있는 전역 변수
 app.locals.version = version;
 app.locals.baseUrl = process.env.BASE_URL || 'https://liar-game.guest-01.dev';
+app.locals.isProd = process.env.NODE_ENV === 'production';
 const httpServer = createServer(app);
 const io = createSocketServer(httpServer);
 
