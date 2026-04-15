@@ -151,7 +151,7 @@
                 <span class="text-sm text-gray-400 w-20">최대 인원</span>
                 <div class="flex items-center gap-3">
                   <input type="range" min="3" max="10" :value="room.maxPlayers"
-                    @input="updateSetting('maxPlayers', parseInt($event.target.value))"
+                    @change="updateSetting('maxPlayers', parseInt($event.target.value))"
                     class="w-32 md:w-40 lg:w-48 accent-primary">
                   <span class="text-white font-medium" x-text="room.maxPlayers + '명'"></span>
                 </div>
