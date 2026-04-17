@@ -85,6 +85,13 @@ function gameRoom() {
     // 결과
     gameResult: null,
 
+    // 피드백
+    feedbackSentiment: null,
+    feedbackMessage: '',
+    feedbackSubmitted: false,
+    feedbackSubmitting: false,
+    feedbackDismissed: Date.now() < Number(localStorage.getItem('feedbackDismissedUntil') || 0),
+
     // 타이핑 애니메이션
     typingText: '',           // 현재 타이핑 중인 텍스트
     typingFullText: '',       // 전체 텍스트
@@ -698,6 +705,42 @@ function gameRoom() {
       this.socket.emit('restart-game');
     },
 
+    // 피드백 일주일간 보지 않기
+    dismissFeedback() {
+      localStorage.setItem('feedbackDismissedUntil', Date.now() + 7 * 24 * 60 * 60 * 1000);
+      this.feedbackDismissed = true;
+    },
+
+    // 피드백 제출
+    submitFeedback() {
+      if (!this.feedbackSentiment) return;
+      this.feedbackSubmitting = true;
+      fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sentiment: this.feedbackSentiment,
+          message: this.feedbackMessage.trim() || undefined,
+          roomId: window.ROOM_ID
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          this.feedbackSubmitting = false;
+          if (data.success) {
+            this.feedbackSubmitted = true;
+            localStorage.setItem('feedbackDismissedUntil', Date.now() + 7 * 24 * 60 * 60 * 1000);
+            setTimeout(() => { this.feedbackDismissed = true; }, 3000);
+          } else {
+            showToast(data.error || '피드백 전송에 실패했습니다.');
+          }
+        })
+        .catch(() => {
+          this.feedbackSubmitting = false;
+          showToast('피드백 전송에 실패했습니다.');
+        });
+    },
+
     // 변론 종료 (변론자 전용)
     endDefense() {
       if (this.defenderId !== this.playerId) return;
@@ -721,6 +764,11 @@ function gameRoom() {
       this.resetNominations();
       this.myFinalVote = null;
       this.gameResult = null;
+      this.feedbackSentiment = null;
+      this.feedbackMessage = '';
+      this.feedbackSubmitted = false;
+      this.feedbackSubmitting = false;
+      this.feedbackDismissed = Date.now() < Number(localStorage.getItem('feedbackDismissedUntil') || 0);
       this.myDescriptionSubmitted = false;
       this.liarRevealPhase = 0;
       this.liarRevealIsLiar = null;

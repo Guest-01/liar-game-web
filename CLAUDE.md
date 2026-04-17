@@ -42,6 +42,8 @@ npx vitest run -t "calculateNominationResult"  # 특정 테스트명으로 필�
 
 **`src/socket/handlers.ts`**: 모든 Socket.IO 이벤트 핸들러. 패턴: 입력 검증 → Room 메서드 호출 → `io.to(roomId).emit()` 브로드캐스트. XSS 방지를 위해 `sanitizeInput()` 사용.
 
+**REST API**: `src/index.ts`에 최소한의 REST 엔드포인트(`GET /api/rooms`, `POST /api/feedback` 등). 실시간 상호작용은 전부 Socket.IO, REST는 초기 데이터 로드나 단발성 작업용.
+
 ### Client-Side Core
 
 **`public/js/game.js`의 `gameRoom()` 함수**: Alpine.js 컴포넌트로 전체 게임 UI 상태 관리. `init()` → Socket 연결 → `setupSocketHandlers()`로 이벤트 리스너 등록. `window.ROOM_ID`, `window.INITIAL_ROOM`, `window.CATEGORIES` 등 서버에서 EJS로 주입하는 전역 변수에 의존.
@@ -62,7 +64,8 @@ npx vitest run -t "calculateNominationResult"  # 특정 테스트명으로 필�
 2. **애니메이션 딜레이**: 한줄 설명 제출 후 서버에서 3.5초 `setTimeout` 대기 (클라이언트 타이핑 애니메이션 보장). 최종 투표 결과 후 12초 대기 (카운트다운 5초 + 타이핑 4초 + 결과 3초).
 3. **로비 실시간 업데이트**: 소켓 room `'lobby'`에 join한 클라이언트에 `broadcastLobbyUpdate()`로 방 목록 변경 푸시.
 4. **호스트 토큰**: 방 생성 시 `nanoid`로 일회용 토큰 발급 → `sessionStorage`에 저장 → 첫 참가 시 전송하여 호스트 권한 획득.
-5. **저장소**: 닉네임은 `localStorage`, 호스트 토큰은 `sessionStorage` 사용.
+5. **저장소**: 닉네임과 `feedbackDismissedUntil`(피드백 카드 숨김 만료 시각)은 `localStorage`, 호스트 토큰은 `sessionStorage` 사용.
+6. **외부 서비스 연동**: 사용자 피드백은 `POST /api/feedback` → 서버가 Discord 웹훅으로 fire-and-forget 전송. 웹훅 URL은 서버 환경변수(`DISCORD_WEBHOOK_URL`)에만 존재하고 클라이언트에 노출되지 않음. 서버 시작 시 웹훅 유효성 검증하여 `app.locals.feedbackEnabled` 결정.
 
 ### Testing
 
@@ -77,3 +80,4 @@ npx vitest run -t "calculateNominationResult"  # 특정 테스트명으로 필�
 - `ALLOWED_ORIGINS` (쉼표 구분, 프로덕션 CORS용)
 - `LOG_LEVEL` (기본: `info`)
 - `NODE_ENV` (`production`일 때 CORS 제한)
+- `DISCORD_WEBHOOK_URL` (설정 시 인앱 피드백 기능 활성화, Discord 채널로 전송)
