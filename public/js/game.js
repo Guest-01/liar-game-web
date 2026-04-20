@@ -86,7 +86,7 @@ function gameRoom() {
     gameResult: null,
 
     // 피드백
-    feedbackSentiment: null,
+    feedbackSentiment: 'neutral',
     feedbackMessage: '',
     feedbackSubmitted: false,
     feedbackSubmitting: false,
@@ -721,7 +721,8 @@ function gameRoom() {
         body: JSON.stringify({
           sentiment: this.feedbackSentiment,
           message: this.feedbackMessage.trim() || undefined,
-          roomId: window.ROOM_ID
+          roomId: window.ROOM_ID,
+          nickname: this.nickname || localStorage.getItem('nickname') || undefined,
         })
       })
         .then(res => res.json())
@@ -764,7 +765,7 @@ function gameRoom() {
       this.resetNominations();
       this.myFinalVote = null;
       this.gameResult = null;
-      this.feedbackSentiment = null;
+      this.feedbackSentiment = 'neutral';
       this.feedbackMessage = '';
       this.feedbackSubmitted = false;
       this.feedbackSubmitting = false;

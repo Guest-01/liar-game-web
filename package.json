@@ -4,7 +4,7 @@
   "description": "라이어 게임 (Word Wolf) 온라인 멀티플레이어 웹 애플리케이션",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "concurrently \"tsx watch src/index.ts\" \"tailwindcss -i src/styles/app.css -o public/css/tailwind.css --watch\"",
+    "dev": "concurrently \"tsx watch --env-file-if-exists=.env src/index.ts\" \"tailwindcss -i src/styles/app.css -o public/css/tailwind.css --watch\"",
     "build": "tailwindcss -i src/styles/app.css -o public/css/tailwind.css --minify && tsc",
     "build:css": "tailwindcss -i src/styles/app.css -o public/css/tailwind.css --minify",
     "start": "node dist/index.js",

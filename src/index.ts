@@ -141,7 +141,7 @@ app.post('/api/feedback', (req, res) => {
     return res.status(404).json({ error: 'Feedback is not available' });
   }
 
-  const { sentiment, message, roomId } = req.body;
+  const { sentiment, message, roomId, nickname } = req.body;
 
   // 감정 검증
   const validSentiments = ['good', 'neutral', 'bad'];
@@ -156,9 +156,16 @@ app.post('/api/feedback', (req, res) => {
     return res.status(429).json({ error: '잠시 후 다시 시도해주세요.' });
   }
 
+  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
   // 메시지 sanitize
   const sanitizedMessage = message
-    ? String(message).slice(0, 500).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    ? escape(String(message).slice(0, 500))
+    : '';
+
+  // 닉네임 sanitize
+  const sanitizedNickname = nickname
+    ? escape(String(nickname).slice(0, 20))
     : '';
 
   const sentimentEmoji: Record<string, string> = {
@@ -166,6 +173,9 @@ app.post('/api/feedback', (req, res) => {
   };
 
   let content = `[${sentimentEmoji[sentiment]}][방: ${roomId || '로비'}]`;
+  if (sanitizedNickname) {
+    content += `[닉네임: ${sanitizedNickname}]`;
+  }
   if (sanitizedMessage) {
     content += ` ${sanitizedMessage}`;
   }
@@ -173,7 +183,7 @@ app.post('/api/feedback', (req, res) => {
   sendToDiscordWebhook({ content });
 
   feedbackCooldowns.set(clientIp, Date.now());
-  logger.info({ roomId: roomId || 'lobby', sentiment }, '피드백 제출');
+  logger.info({ roomId: roomId || 'lobby', sentiment, nickname: sanitizedNickname || undefined }, '피드백 제출');
   res.json({ success: true });
 });
 
@@ -260,7 +270,7 @@ httpServer.listen(PORT, async () => {
   const result = await validateDiscordWebhook();
   if (result.status === 'valid') {
     app.locals.feedbackEnabled = true;
-    logger.info({ name: result.name }, `✉️  피드백 기능 활성화됨 — "${result.name}"으로 전송`);
+    logger.info({ webhookName: result.name }, `✉️  피드백 기능 활성화됨 — "${result.name}"으로 전송`);
   } else if (result.status === 'invalid') {
     logger.error(`❌ DISCORD_WEBHOOK_URL이 유효하지 않습니다 (${result.reason}). 피드백 기능을 비활성화합니다.`);
   } else {
