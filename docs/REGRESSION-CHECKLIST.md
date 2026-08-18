@@ -217,3 +217,49 @@ v1에 없던 기능이라 과거 버그는 없지만, **구조적으로 위험�
 - [ ] **모든 클라이언트를 강제 종료해도** 서버의 단계 전환이 계속 진행된다.
 - [ ] 호스트가 사라져도 게임이 멈추지 않는다.
 - **왜**: v1 최대 결함의 정면 대응 테스트다.
+
+---
+
+## G. Colyseus 특유의 함정
+
+> 출처: `docs/spikes/colyseus/FINDINGS.md` (2026-08-18 스파이크에서 **실제로 겪은** 것들).
+> 고정 버전: `colyseus@0.17.10` + `@colyseus/sdk@0.17.43`.
+
+### G1. `onLeave`의 두 번째 인자는 boolean이 아니라 close code · **최우선**
+- [ ] `onLeave(client, code: number)`에서 `const consented = code === 4000;`으로 판정한다.
+- **왜**: 0.16의 `consented: boolean`이 0.17에서 `code: number`로 바뀌었다.
+  `if (consented)`로 쓴 코드는 **타입 에러 없이 컴파일되지만 동작이 정반대**다 —
+  숫자는 항상 truthy라 모든 끊김이 정상 퇴장으로 처리되어 **재접속이 영원히 안 된다.**
+- **테스트**: 비정상 종료(4000이 아닌 코드) 후 유예 내 재접속이 성공한다.
+
+### G2. `StateView`는 `@colyseus/schema`에서 import
+- [ ] `import { StateView } from "@colyseus/schema"` — `colyseus`에서 가져오지 않는다.
+- **왜**: `colyseus`에서 import하면 `undefined`이고 런타임에야 터진다.
+
+### G3. `Server.listen()`을 반드시 사용
+- [ ] 외부 http 서버를 직접 `listen()` 하지 않고 `gameServer.listen(PORT)`를 쓴다.
+- **왜**: `setTransport()`가 `Server.listen()` 안에서 실행된다. 건너뛰면 매치메이킹이
+  `Cannot read properties of undefined (reading 'protocol')`로 죽는다.
+
+### G4. 버전 정확 고정
+- [ ] `colyseus`와 `@colyseus/sdk` 버전을 캐럿/틸드 없이 정확히 고정한다.
+- **왜**: `@colyseus/core@0.16.25`는 `workspace:^` 미해결 상태로 배포되어 **설치 자체가 불가능**했다.
+  SDK의 `next` 태그는 이미 0.18이다. 버전 이동이 빠르고 QA가 균일하지 않다.
+- **테스트**: `npm ci`가 깨끗한 환경에서 성공한다 (CI에서 이미 검증됨).
+
+### G5. 클라이언트 SDK 패키지명
+- [ ] `colyseus.js`가 아니라 **`@colyseus/sdk`** 를 쓴다.
+- **왜**: 0.17에서 개명됐다. 구 `colyseus.js@0.16.x`는 0.17 서버와 **wire 비호환**이다
+  (seat reservation 응답이 중첩 구조 → 평면 구조로 변경).
+
+### G6. 테스트 작성 시 방 최소 가동시간
+- [ ] 재접속 테스트는 방 생성 후 **5초 이상** 지난 뒤 수행한다.
+- **왜**: 0.17에 `min uptime: 5000ms` 가드가 있어 그 전에는 자동 재접속이 거부된다.
+  프로덕션에서는 무관하지만 **테스트가 거짓 실패**한다.
+
+### G7. 정보 은닉 테스트를 바이트 수준으로
+- [ ] C2 테스트를 **디코딩된 state가 아니라 전송 바이트**에서 검증한다.
+- **왜**: 디코딩 결과만 보면 인코더 변경이나 StateView 설정 실수를 놓칠 수 있다.
+  스파이크의 `run.ts` C2-5가 참조 구현이다 (소켓 `send`를 래핑해 바이트를 수집하고
+  센티널 문자열을 검색).
+- **이 테스트가 깨지면 배포를 막는다.**

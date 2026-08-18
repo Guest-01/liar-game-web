@@ -1,0 +1,17 @@
+{
+  "name": "colyseus-spike",
+  "private": true,
+  "type": "commonjs",
+  "description": "Colyseus 채택 검증용 스파이크. 프로덕션 코드 아님.",
+  "scripts": {
+    "hiding": "tsx src/run.ts",
+    "reconnect": "tsx src/reconnect.ts",
+    "grace": "GRACE=2 tsx src/grace.ts",
+    "bench": "tsx src/bench.ts"
+  },
+  "dependencies": {
+    "colyseus": "0.17.10",
+    "@colyseus/sdk": "0.17.43"
+  },
+  "devDependencies": { "tsx": "^4", "typescript": "^5" }
+}
