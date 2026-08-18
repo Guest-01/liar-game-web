@@ -3,7 +3,6 @@ node_modules/
 
 # Build output
 dist/
-public/css/tailwind.css
 
 # Environment variables
 .env
@@ -30,3 +29,6 @@ coverage/
 # Temporary files
 tmp/
 temp/
+
+# Vite
+.vite/

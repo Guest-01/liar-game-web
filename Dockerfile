@@ -1,3 +1,7 @@
+# ⚠️ v1(v1.4.1) 기준 파일이다. v2 구조(shared/ server/ client/)에 맞지 않으므로
+# 현재 상태로는 빌드되지 않는다. M1에서 package.json이 생길 때 함께 맞춘다.
+# 유지하는 이유: 멀티스테이지 구조와 node:22-alpine 선택은 그대로 재사용한다.
+
 # Build stage
 FROM node:22-alpine AS builder
 

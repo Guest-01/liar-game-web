@@ -275,3 +275,12 @@ v1에 없던 기능이라 과거 버그는 없지만, **구조적으로 위험�
 - [ ] 클라이언트 어댑터가 쓰는 `state.toJSON()` 결과에 타인의 비밀 필드 **키가 없다.**
 - **왜**: 어댑터가 전체 스냅샷을 만들므로, 여기서 새면 UI 전체로 샌다.
 - **테스트**: 관전자 스냅샷을 직렬화해 금칙어를 검색한다 (C2/G7와 함께).
+
+### G10. `Room` 제네릭이 0.17에서 바뀌었다 + `tsc --noEmit`을 CI에 둘 것
+- [ ] `class LiarRoom extends Room<{ state: RoomSchema }>` 형태를 쓴다 (0.16의 `Room<State>` 아님).
+- [ ] **CI에 `tsc --noEmit`이 있다.**
+- **왜**: 0.17에서 `Room<T extends RoomOptions>`로 바뀌어 `T`가 `{ state, metadata?, client? }` 형태다.
+  더 중요한 건 **발견 경위**다 — 스파이크를 `tsx`로 실행했더니 타입 체크를 건너뛰어
+  이 오류가 끝까지 보이지 않았다. `tsc`를 처음 돌린 순간 드러났다.
+  `tsx`/`vite`는 트랜스파일만 하고 타입을 검사하지 않는다.
+- **테스트**: CI가 `tsc -p tsconfig.server.json --noEmit`과 `svelte-check`를 모두 실행한다.

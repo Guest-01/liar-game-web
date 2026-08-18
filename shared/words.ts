@@ -1,4 +1,10 @@
-import { WordCategory } from '../game/types';
+// 6개 카테고리 186단어. v1(v1.4.1)에서 이식한 손으로 고른 콘텐츠.
+// 다시 만들 수 없으므로 함부로 줄이지 말 것.
+
+export interface WordCategory {
+  name: string;
+  words: string[];
+}
 
 export const categories: WordCategory[] = [
   {
@@ -68,22 +74,3 @@ export const categories: WordCategory[] = [
     ]
   }
 ];
-
-export function getRandomWords(categoryName: string): { citizen: string; liar: string } | null {
-  const category = categories.find(c => c.name === categoryName);
-  if (!category || category.words.length < 2) {
-    return null;
-  }
-
-  // Fisher-Yates 셔플로 첫 2개 단어 선택
-  const words = [...category.words];
-  for (let i = words.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [words[i], words[j]] = [words[j], words[i]];
-  }
-  return { citizen: words[0], liar: words[1] };
-}
-
-export function getCategoryNames(): string[] {
-  return categories.map(c => c.name);
-}

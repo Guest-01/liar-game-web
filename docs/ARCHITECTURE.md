@@ -50,44 +50,140 @@
 
 ---
 
-## 2. 디렉터리 구조
+## 2. 저장소 구조
 
-단일 `package.json`. 워크스페이스를 쓰지 않는다(미니멀).
-`src/shared`를 서버·클라이언트가 함께 import 한다.
+### 2.0 프레이밍
+
+**"서버 + SPA = 이중 구조"가 아니라 하나의 앱에 컴파일 타깃이 둘이다.**
+
+- 배포 산출물이 **한 개** (Docker 이미지 하나)
+- 서버가 클라이언트 번들을 **같은 오리진에서 직접 서빙**
+- 독립 버저닝·독립 배포가 **없음**
+- `shared/`가 양쪽에 컴파일되어 들어감
+
+따라서 **npm workspaces(모노레포)를 쓰지 않는다.** 워크스페이스의 이점
+(독립 버저닝, 개별 배포, 팀 간 의존성 격리)이 하나도 해당되지 않는 반면,
+`shared/`를 먼저 빌드해야 하는 **빌드 순서 문제**만 새로 생긴다.
+
+### 2.1 디렉터리
+
+`src/`를 두지 않고 **최상위에 세 디렉터리**를 둔다 — 이중성이 최상위에서 바로 보이게.
 
 ```
-src/
-  shared/                  # 서버·클라이언트 공용. 프레임워크 의존 없음
-    constants.ts           #   튜닝 상수 (REQUIREMENTS §5)
-    words.ts               #   6카테고리 186단어 (v1 이식)
-    nicknames.ts           #   랜덤 닉네임 생성기 (v1 이식)
-    protocol.ts            #   클라→서버 메시지 zod 스키마 + 추론 타입
-    rules.ts               #   순수 게임 규칙 (집계·판정·점수)
-    types.ts               #   Phase, GameMode 등
-  server/
-    index.ts               # Express + Colyseus 부팅, 메타 셸 라우트
-    shell.ts               # 경로별 OG 메타 주입
-    feedback.ts            # POST /api/feedback (Discord 웹훅)
-    rooms/
-      LiarRoom.ts          #   Colyseus Room — 얇은 어댑터
-      state.ts             #   Schema 정의 (공개/@view 분리)
-      phases.ts            #   상태 머신 전이 테이블
-      projection.ts        #   StateView 관리 — 정보 은닉 단일 지점
-      timer.ts             #   페이즈 타이머 + 일시정지
-      LobbyRoom.ts         #   로비 실시간 방 목록
-  client/
-    main.ts
-    router.ts              # 경량 라우터 (3경로)
-    lib/
-      connection.svelte.ts #   Colyseus 연결 + $state 스토어
-      session.ts           #   닉네임(localStorage) / 재접속 토큰(sessionStorage)
-    routes/                # Lobby.svelte / Create.svelte / Room.svelte
-    game/                  # 페이즈별 화면 컴포넌트
-    fx/                    # 연출 (타이핑·셔플·라이어공개·펄스)
-    ui/                    # 공용 (토스트·모달·채팅시트)
+liar-game-web/
+├─ docs/                     명세·아키텍처·체크리스트
+│
+├─ shared/                   ★ 프레임워크 의존 0. 양쪽에 컴파일됨
+│   ├─ constants.ts            튜닝 상수 (REQUIREMENTS §5)
+│   ├─ words.ts                6카테고리 180단어 (카테고리당 30개)        ← v1 이식
+│   ├─ nicknames.ts            랜덤 닉네임 생성기        ← v1 이식
+│   ├─ protocol.ts             클라→서버 메시지 zod 스키마
+│   ├─ snapshot.ts             RoomSnapshot 타입 — 계약의 원본
+│   └─ rules.ts                순수 게임 규칙 (집계·판정·점수)
+│
+├─ server/                   ★ tsc가 컴파일 → dist/server
+│   ├─ index.ts                Express + Colyseus 부팅
+│   ├─ shell.ts                경로별 OG 메타 주입
+│   ├─ feedback.ts             POST /api/feedback
+│   └─ rooms/
+│       ├─ LiarRoom.ts         Colyseus Room — 얇은 어댑터
+│       ├─ state.ts            Schema 정의 (공개 / @view 분리)
+│       ├─ phases.ts           상태 머신 전이 테이블
+│       ├─ projection.ts       StateView 관리 — 정보 은닉 단일 지점
+│       ├─ timer.ts            페이즈 타이머 + 일시정지
+│       └─ LobbyRoom.ts        로비 실시간 방 목록
+│
+├─ client/                   ★ vite가 번들 → dist/public
+│   ├─ main.ts  router.ts
+│   ├─ app.css                 테마 색 + 키프레임      ← v1 이식
+│   ├─ lib/     connection.svelte.ts  session.ts
+│   ├─ routes/  Lobby.svelte  Create.svelte  Room.svelte
+│   ├─ game/    페이즈별 화면 컴포넌트
+│   ├─ fx/      연출 (타이핑·셔플·라이어공개·펄스)
+│   └─ ui/      공용 (토스트·모달·채팅시트)
+│
+├─ public/                   Vite publicDir → 그대로 복사
+│   └─ favicon.svg  favicon.png  robots.txt  sitemap.xml   ← v1 이식
+├─ index.html                SPA 셸 (서버가 메타 주입해 반환)
+│
+├─ package.json              ★ 하나
+├─ tsconfig.json             base
+├─ tsconfig.server.json      tsc 빌드용
+├─ tsconfig.client.json      Vite·에디터용
+├─ vite.config.ts
+├─ Dockerfile  .dockerignore  .env.example
+└─ .github/workflows/
 ```
 
-**빌드 3단계**: `tsc -p tsconfig.server.json` · `vite build` · `tailwindcss`
+**빌드 산출물**
+
+```
+dist/
+├─ shared/     tsc  ← 서버가 import
+├─ server/     tsc  ← node dist/server/index.js
+└─ public/     vite ← 서버가 정적 서빙
+```
+
+### 2.2 구조를 성립시키는 결정 (전부 실측 검증)
+
+#### ① ESM 전면 통일
+
+`"type": "module"` + `module: NodeNext`. v1의 CommonJS를 물려받지 않는다.
+서버·클라이언트·shared가 같은 모듈 시스템이라 `shared/`가 별도 처리 없이 성립한다.
+Colyseus 데코레이터와 StateView가 ESM에서 정상 동작함을 확인했다.
+
+#### ② alias 없이 상대 경로 + `.js` 확장자
+
+```ts
+import { canStart } from "../shared/rules.js";   // 서버·클라이언트 완전히 동일
+```
+
+**tsc와 Vite 양쪽이 설정 없이 처리한다.** `paths` / `tsc-alias` / Vite alias가 전부 불필요.
+
+> `.ts` 파일을 `.js`로 import하는 것이 처음엔 어색하다. 대안은 서버도 esbuild로
+> 번들하는 것이지만(확장자 규칙이 사라짐) 도구가 하나 늘어난다. 미니멀 원칙상 ①을 택한다.
+
+#### ③ `package.json` 하나 — 의존성 구분이 자연스럽게 맞는다
+
+| | 내용 |
+|---|---|
+| `dependencies` | 런타임 서버가 실제로 로드 — `colyseus`, `@colyseus/ws-transport`, `express`, `zod`, `pino` |
+| `devDependencies` | 빌드 도구 **+ 클라이언트 라이브러리 전부** — `svelte`, `vite`, `@colyseus/sdk`, `tailwindcss`, `typescript`, `vitest`, `@colyseus/testing` |
+
+클라이언트 라이브러리가 `devDependencies`인 것이 **맞다** — 번들에 인라인되므로
+런타임 이미지에 필요 없다. Dockerfile의 `npm ci --omit=dev`가 v1과 동일하게 동작한다.
+
+#### ④ `shared/snapshot.ts`가 계약의 원본
+
+Colyseus 클라이언트는 리플렉션으로 디코딩하므로 **Schema 클래스를 공유할 필요가 없다**
+(스파이크에서 확인). Schema는 서버 전용으로 두되, 표류를 막기 위해
+`shared/snapshot.ts`의 타입을 원본으로 삼고 서버에서 컴파일 타임에 검사한다.
+
+```ts
+// server/rooms/state.ts 말미
+const _contract: RoomSnapshot = null as unknown as ReturnType<RoomSchema["toJSON"]>;
+```
+
+### 2.3 `shared/`의 규율
+
+- **들어간다**: 상수, 단어 데이터, 닉네임 생성기, 프로토콜 zod 스키마, 순수 규칙 함수, 타입
+- **안 들어간다**: Colyseus Schema 클래스(서버 전용), Svelte 컴포넌트, Node API를 쓰는 코드
+- **규칙**: `shared/`는 어떤 프레임워크도 import 하지 않는다. `zod`만 예외로 허용한다.
+
+### 2.4 빌드·개발 명령
+
+```
+build          vite build && tsc -p tsconfig.server.json
+dev            vite (5173) + tsx watch server/index.ts (3000) 동시 실행
+typecheck      tsc -p tsconfig.server.json --noEmit && svelte-check
+test           vitest run
+```
+
+> ### ⚠️ 개발 모드에만 프록시가 있다
+> Vite dev(5173)와 Colyseus(3000)가 별도 포트이므로 `vite.config.ts`의 `server.proxy`가
+> 매치메이킹 HTTP와 WebSocket 업그레이드를 중계한다.
+> **프로덕션은 같은 오리진이라 프록시가 없다.**
+> 이 차이를 잊으면 "로컬은 되는데 배포하면 안 됨"이 발생한다.
 
 ---
 
@@ -123,7 +219,7 @@ class PlayerSchema extends Schema {
 라운드 진행 중 라이어 ID와 제시어는 **Schema 밖의 서버 전용 필드**에 둔다.
 
 ```ts
-class LiarRoom extends Room<RoomSchema> {
+class LiarRoom extends Room<{ state: RoomSchema }> {   // ← 0.17 제네릭 형태
   private secret: { liarId: string; citizenWord: string; liarWord: string | null } | null = null;
 }
 ```

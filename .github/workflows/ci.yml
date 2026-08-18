@@ -1,3 +1,7 @@
+# ⚠️ v1 기준. package.json이 없는 현재 상태로는 통과하지 못한다. M1에서 맞춘다.
+# (트리거가 main 대상 push/PR뿐이라 v2 브랜치 푸시로는 실행되지 않는다.)
+# 그때 `tsc --noEmit`과 `svelte-check`를 반드시 추가할 것 (체크리스트 G10).
+
 name: CI
 
 on:
