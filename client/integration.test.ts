@@ -13,6 +13,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { LiarRoom } from "../server/rooms/LiarRoom.js";
 import { createRoom, game, joinRoom, leave, setEndpoint } from "./lib/connection.svelte.js";
 import PlayerList from "./game/PlayerList.svelte";
+import Room from "./routes/Room.svelte";
 
 const PORT = 2599;
 let gameServer: Server;
@@ -71,5 +72,71 @@ describe("실 서버 + Svelte 반응성", () => {
   it("서버가 거부하면 오류가 상태에 담긴다", async () => {
     await expect(joinRoom("NOPE_NOT_A_ROOM", "누군가")).rejects.toThrow();
     expect(game.error).toBeTruthy();
+  });
+
+  /**
+   * 회귀: 방을 만들면 Create.svelte가 이미 연결을 맺어둔 상태에서
+   * `/room/:id` 로 이동하고, Room.svelte의 $effect가 joinRoom을 부른다.
+   * 가드가 없으면 방금 저장한 토큰으로 **자기 자신에게 재접속**해 버려서
+   * 서버가 기존 소켓을 끊고("접속이 끊겼습니다") 새로 붙인다("돌아왔습니다").
+   *
+   * Playwright 스모크가 실제로 잡아낸 결함이다. 컴포넌트를 개별 마운트하는
+   * 테스트로는 화면 전환이 없어 재현되지 않는다.
+   */
+  it("★ 방을 만든 직후 같은 방으로 재진입해도 재접속이 일어나지 않는다", async () => {
+    await leave();
+    const roomId = await createRoom({
+      nickname: "회귀", roomName: "회귀방", isPublic: true,
+    });
+    await wait(400);
+    const sid = game.mySessionId;
+    const chatBefore = game.snapshot!.chat.length;
+
+    // Room.svelte의 $effect가 하는 일 그대로
+    await joinRoom(roomId, "회귀");
+    await wait(400);
+
+    expect(game.mySessionId, "세션이 유지된다").toBe(sid);
+    expect(
+      game.snapshot!.chat.length,
+      "끊김/복귀 시스템 메시지가 생기지 않는다",
+    ).toBe(chatBefore);
+  });
+
+  /**
+   * 회귀: 위 가드를 `game.room`(= $state)으로 읽으면 Room.svelte의 $effect가
+   * 그것을 의존성으로 추적한다. attach()가 값을 쓰는 순간 effect가 무효화되고
+   * cleanup의 leave()가 돌아 join → leave → join 이 무한히 반복된다.
+   * 화면이 계속 재생성되어 입력이 먹지 않는다.
+   *
+   * 그래서 진짜 화면을 마운트해서 본다. 개별 컴포넌트만 렌더하면 $effect가
+   * 없어서 재현되지 않는다.
+   */
+  it("★ 방 화면을 띄워도 join↔leave 루프에 빠지지 않는다", async () => {
+    await leave();
+
+    // **남이 만든 방에 들어가는** 경로여야 한다. 내가 만든 방이면 가드가 즉시
+    // 참이라 game.room이 바뀌지 않아 루프가 재현되지 않는다.
+    const { Client } = await import("@colyseus/sdk");
+    const owner = await new Client(`ws://localhost:${PORT}`)
+      .create("liar", { nickname: "주인", roomName: "루프방", isPublic: true });
+
+    localStorage.setItem("nickname", "루프");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = mount(Room, { target: host, props: { roomId: owner.roomId } });
+    flushSync();
+    await wait(1500);          // 루프가 있다면 이 사이에 몇 번이고 돈다
+
+    expect(game.room, "연결이 유지된다").not.toBeNull();
+    // 루프가 돌면 입장/퇴장 시스템 메시지가 계속 쌓인다 (정상은 주인 + 나 = 2줄)
+    expect(
+      game.snapshot!.chat.length,
+      "재입장이 반복되지 않는다",
+    ).toBeLessThanOrEqual(2);
+
+    unmount(app);
+    host.remove();
+    await owner.leave();
   });
 });

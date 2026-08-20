@@ -9,6 +9,15 @@ async function setNickname(page: Page, nickname: string) {
   await page.addInitScript((n) => localStorage.setItem("nickname", n), nickname);
 }
 
+/**
+ * 플레이어 목록의 항목.
+ *
+ * 닉네임만으로 찾으면 시스템 채팅("○○님이 입장했습니다")까지 걸려
+ * strict mode violation이 난다. 대기실에서 `listitem`은 PlayerList뿐이다.
+ */
+const playerItem = (page: Page, nickname: string) =>
+  page.getByRole("listitem").filter({ hasText: nickname });
+
 test("로비가 뜬다", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "라이어 게임" })).toBeVisible();
@@ -23,9 +32,13 @@ test("방을 만들면 대기실로 들어간다", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/room\/[A-Za-z0-9_-]+/);
   await expect(page.getByText("게임 설정")).toBeVisible();
-  await expect(page.getByText("호스트")).toBeVisible();
+  await expect(playerItem(page, "호스트")).toBeVisible();
   // 혼자면 시작할 수 없다 (최소 4명)
   await expect(page.getByRole("button", { name: /최소 4명/ })).toBeDisabled();
+
+  // 방을 만든 직후 자기 자신에게 재접속하면 안 된다.
+  // 채팅에 남는 시스템 메시지가 그 증거다 (client/integration.test.ts의 짝).
+  await expect(page.getByText("접속이 끊겼습니다")).toHaveCount(0);
 });
 
 test("★ 두 번째 참가자가 첫 번째 화면에 실시간으로 나타난다", async ({ browser }) => {
@@ -44,8 +57,8 @@ test("★ 두 번째 참가자가 첫 번째 화면에 실시간으로 나타난
   await guestPage.goto(roomUrl);
 
   // 서버 상태가 양쪽에 반영된다
-  await expect(hostPage.getByText("보라매")).toBeVisible();
-  await expect(guestPage.getByText("앨리스")).toBeVisible();
+  await expect(playerItem(hostPage, "보라매")).toBeVisible();
+  await expect(playerItem(guestPage, "앨리스")).toBeVisible();
   await expect(guestPage.getByText("호스트가 게임을 시작할 때까지")).toBeVisible();
 
   await hostCtx.close();
@@ -63,7 +76,7 @@ test("채팅이 두 탭 사이를 왕복한다", async ({ browser }) => {
   const b = await browser.newContext(); const pb = await b.newPage();
   await setNickname(pb, "보라매");
   await pb.goto(pa.url());
-  await expect(pb.getByText("앨리스")).toBeVisible();
+  await expect(playerItem(pb, "앨리스")).toBeVisible();
 
   await pb.getByPlaceholder("메시지 입력…").fill("안녕하세요");
   await pb.getByRole("button", { name: "전송" }).click();

@@ -47,7 +47,18 @@ export const game = $state<{
 let ticker: ReturnType<typeof setInterval> | null = null;
 let graceTicker: ReturnType<typeof setInterval> | null = null;
 
+/**
+ * 지금 붙어 있는 방. **`game.room`으로 대신하면 안 된다.**
+ *
+ * `game`은 `$state`라서 `joinRoom`이 그것을 읽으면 호출자인 Room.svelte의
+ * `$effect`가 의존성으로 등록한다. 그러면 `attach()`가 값을 쓰는 순간 effect가
+ * 무효화되어 cleanup의 `leave()` → 재실행 → 다시 join 으로 무한히 돈다.
+ * 화면 전체가 계속 재생성되어 입력이 먹지 않는다.
+ */
+let attachedRoomId: string | null = null;
+
 function attach(room: Room): void {
+  attachedRoomId = room.roomId;
   game.room = room;
   game.mySessionId = room.sessionId;
   game.error = "";
@@ -64,6 +75,7 @@ function attach(room: Room): void {
   room.onLeave((code: number) => {
     stopCountdown();
     stopGraceCountdown();
+    attachedRoomId = null;
     game.room = null;
     // 정상 퇴장(4000)이면 토큰을 버린다. 비정상이면 새로고침 복귀를 위해 남긴다.
     if (code === 4000) clearReconnectToken(room.roomId);
@@ -136,6 +148,15 @@ export async function createRoom(opts: {
  * 일반 참가로 넘어간다 (게임 중이면 서버가 거부한다).
  */
 export async function joinRoom(roomId: string, nickname: string, password?: string): Promise<void> {
+  // 이미 이 방에 붙어 있으면 그대로 쓴다.
+  //
+  // 방을 만든 직후가 이 경우다. Create.svelte가 createRoom()으로 연결을 맺고
+  // `/room/:id` 로 이동하면 Room.svelte의 $effect가 여기를 부른다. 가드가 없으면
+  // 아래에서 방금 저장한 토큰을 집어 **자기 자신에게 재접속**하고, 서버는 기존
+  // 소켓을 끊었다가 새로 붙인다 — 채팅에 "접속이 끊겼습니다 / 돌아왔습니다"가
+  // 남고 소켓 하나가 버려진다.
+  if (attachedRoomId === roomId) return;
+
   game.connecting = true;
 
   const token = loadReconnectToken(roomId);
@@ -164,6 +185,7 @@ export function send<T extends MessageType>(type: T, payload: unknown = {}): voi
 export async function leave(): Promise<void> {
   stopCountdown();
   stopGraceCountdown();
+  attachedRoomId = null;
   const id = game.room?.roomId;
   if (id) clearReconnectToken(id);
   await game.room?.leave();
