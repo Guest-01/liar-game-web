@@ -156,10 +156,13 @@ SDK가 그대로 붙는다.
 CI와 배포 파이프라인에서 **의도적으로 뺐다.** UI를 크게 손봤을 때 손으로 돌린다.
 
 ```
-sudo apt-get install -y libnss3 libnspr4   # WSL 최초 1회 (Windows는 불필요)
-npm run test:e2e:install                   # 브라우저 내려받기 (~115MB)
-npm run test:e2e                           # 빌드 포함 약 1분
+npm run test:e2e     # 빌드 포함 약 1분, 테스트 자체는 11초
 ```
+
+**브라우저를 내려받지 않는다.** `channel: "msedge"`로 로컬에 이미 있는 Edge를
+쓴다 (Playwright MCP도 같은 것을 쓴다). Playwright 전용 chromium은 697MB다.
+Edge가 없는 환경(WSL 등)에서는 `npx playwright install chromium` 후
+`playwright.config.ts`의 channel 줄을 지운다.
 
 **2026-08-20 첫 실행에서 5건 중 3건이 깨졌고, 그중 하나는 진짜 결함이었다.**
 방을 만든 직후 `/room/:id` 로 넘어가면서 **자기 자신에게 재접속**해

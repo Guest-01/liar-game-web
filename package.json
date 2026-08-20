@@ -22,8 +22,7 @@
     "test:client": "vitest run --project client",
     "test:server": "vitest run --project server",
     "bots": "node scripts/bots.mjs",
-    "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install --with-deps chromium"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@colyseus/schema": "4.0.31",
