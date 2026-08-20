@@ -13,6 +13,8 @@
  */
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 
 const DEFAULT_PORT = 2567;       // Colyseus 기본값. 3000은 다른 도구와 너무 자주 겹친다
 const DEFAULT_HMR_PORT = 24678;  // Vite HMR 전용. 프록시를 타지 않아야 한다 (아래 참조)
@@ -74,12 +76,39 @@ console.log(`\n▶ 서버 :${port}  ·  HMR :${hmrPort}  ·  Vite가 알려주�
 // shell:true와 배열 인자를 함께 쓰면 배열이 공백으로 이어 붙어 각 명령이
 // 쪼개진다. 인자를 그대로 전달하기 위해 셸을 쓰지 않는다.
 // PORT는 env로 내려가므로 명령 문자열에 넣지 않는다.
+//
+// 그래서 `npx`를 부르지 않고 concurrently의 JS 진입점을 직접 node로 돌린다.
+// Windows에서 실행 파일은 `npx.cmd`인데 셸 없이 spawn하면 CreateProcess가
+// PATHEXT를 보지 않아 `spawn npx ENOENT`가 난다. concurrently는 이미 로컬
+// 의존성이므로 npx를 거칠 이유도 없다.
+const require = createRequire(import.meta.url);
+const concurrently = path.join(
+  path.dirname(require.resolve("concurrently/package.json")),
+  "dist", "bin", "index.js",
+);
+
+// concurrently가 돌리는 `tsx`·`vite`는 PATH에서 찾는다. npm run으로 들어오면
+// npm이 node_modules/.bin을 넣어주지만, node로 직접 실행하면 없다. npx가 해주던
+// 일이므로 여기서 대신 넣는다.
+const binDir = path.join(process.cwd(), "node_modules", ".bin");
+// Windows의 환경 변수 이름은 대소문자를 가리지 않는다. "Path"가 이미 있는데
+// "PATH"를 새로 넣으면 키가 둘이 되어 어느 쪽이 이길지 알 수 없다.
+const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+
 const child = spawn(
-  "npx",
-  ["concurrently", "-n", "server,client", "-c", "blue,magenta",
+  process.execPath,
+  [concurrently, "-n", "server,client", "-c", "blue,magenta",
    "tsx watch --env-file-if-exists=.env server/index.ts",
    "vite"],
-  { stdio: "inherit", env: { ...process.env, PORT: String(port), VITE_HMR_PORT: String(hmrPort) } },
+  {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      [pathKey]: `${binDir}${path.delimiter}${process.env[pathKey] ?? ""}`,
+      PORT: String(port),
+      VITE_HMR_PORT: String(hmrPort),
+    },
+  },
 );
 
 const stop = () => child.kill("SIGINT");
