@@ -14,6 +14,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Server } from "colyseus";
 import { LiarRoom } from "./LiarRoom.js";
 
+/** 연출 대기 없이 규칙만 검증하기 위한 테스트용 방 */
+class NoFxRoom extends LiarRoom {
+  protected override fxScale = 0;
+}
+
 let colyseus: ColyseusTestServer;
 
 /** 각 클라이언트에게 전송된 원시 바이트를 수집한다 */
@@ -43,7 +48,7 @@ const contains = (buf: Buffer, s: string) => buf.includes(Buffer.from(s, "utf8")
 
 beforeAll(async () => {
   colyseus = await boot({
-    initializeGameServer: (gs: Server) => { gs.define("liar", LiarRoom); },
+    initializeGameServer: (gs: Server) => { gs.define("liar", NoFxRoom); },
   } as any);
 });
 afterAll(async () => { await colyseus.shutdown(); });

@@ -61,10 +61,20 @@ export class RoomSchema extends Schema {
   @type("uint8")   currentDescriberIndex = 0;
   @type("string")  defendantId = "";
 
-  // 개표
-  @type("uint8") agreeCount = 0;
-  @type("uint8") disagreeCount = 0;
-  @type("uint8") abstainCount = 0;
+  // 개표 — vote-reveal 진입 시에만 채워진다
+  @type("uint8")   agreeCount = 0;
+  @type("uint8")   disagreeCount = 0;
+  @type("uint8")   abstainCount = 0;
+  @type("boolean") executionConfirmed = false;
+
+  /**
+   * 처형된 피고가 라이어였는가. **처형이 확정됐을 때만 설정한다.**
+   *
+   * 확정되지 않았다면 라운드가 계속되므로 이 값을 채우면 라이어 정체가 샌다.
+   * 미확정 시에는 항상 false로 남으며, 클라이언트도 executionConfirmed가
+   * true일 때만 읽는다.
+   */
+  @type("boolean") defendantWasLiar = false;
 
   @type({ map: PlayerSchema }) players = new MapSchema<PlayerSchema>();
   @type([ChatSchema])          chat = new ArraySchema<ChatSchema>();

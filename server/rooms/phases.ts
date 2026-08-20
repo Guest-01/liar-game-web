@@ -1,5 +1,6 @@
 import {
-  DESCRIPTION_REVEAL_MS, FINAL_VOTE_MS, LIAR_GUESS_MS, VOTE_REVEAL_MS,
+  DESCRIPTION_REVEAL_MS, FINAL_VOTE_MS, LIAR_GUESS_MS, LIAR_REVEAL_MS,
+  ORDER_REVEAL_MS, VOTE_REVEAL_MS,
 } from "../../shared/constants.js";
 import type { MessageType } from "../../shared/protocol.js";
 import type { Phase } from "../../shared/types.js";
@@ -38,6 +39,12 @@ export const PHASES: Record<Phase, PhaseDef> = {
     duration: null,
     accepts: only("check-word"),
   },
+  "order-reveal": {
+    // ⟨연출⟩ 발언 순서 추첨. 이 시간을 설명 제한시간에서 떼어내지 않기 위해
+    // 별도 페이즈로 둔다 — 첫 설명자가 손해를 보면 안 된다.
+    duration: () => ORDER_REVEAL_MS,
+    accepts: only(),
+  },
   "description": {
     duration: (s) => s.descriptionTime * 1000,
     accepts: only("submit-description"),
@@ -60,7 +67,8 @@ export const PHASES: Record<Phase, PhaseDef> = {
     accepts: only("final-vote"),
   },
   "vote-reveal": {
-    duration: () => VOTE_REVEAL_MS,
+    // ⟨연출⟩ 개표 카운트다운. 처형이 확정되면 라이어 공개까지 이어지므로 더 길다.
+    duration: (s) => VOTE_REVEAL_MS + (s.executionConfirmed ? LIAR_REVEAL_MS : 0),
     accepts: only(),
   },
   "liar-guess": {
@@ -75,6 +83,14 @@ export const PHASES: Record<Phase, PhaseDef> = {
   "scoreboard":   { duration: null, accepts: only("next-round") },
   "match-result": { duration: null, accepts: only("next-round") },
 };
+
+/**
+ * 연출 페이즈. 게임 규칙이 아니라 보여주기 위한 시간이므로
+ * 테스트에서는 길이를 0으로 줄여 즉시 통과시킨다 (LiarRoom.fxScale).
+ */
+export const FX_PHASES: ReadonlySet<Phase> = new Set<Phase>([
+  "order-reveal", "description-reveal", "vote-reveal",
+]);
 
 export function phaseAccepts(phase: string, type: MessageType): boolean {
   const def = PHASES[phase as Phase];

@@ -12,6 +12,7 @@ import { LiarRoom } from "./LiarRoom.js";
 /** 유예를 1초로 줄인 테스트용 방 */
 class FastGraceRoom extends LiarRoom {
   protected override graceSeconds = 1;
+  protected override fxScale = 0;   // 연출 대기 없이 테스트한다
 }
 
 let colyseus: ColyseusTestServer;
@@ -120,15 +121,16 @@ describe("라운드 종료 보장 (F4)", () => {
     room.state.descriptionAttempts = 1;
     room.startDiscussion();
 
-    // 아무도 지목하지 않는 상황을 반복해서 강제한다
+    // 아무도 지목하지 않는 상황을 반복해서 강제한다.
+    // 연출 페이즈(order-reveal 등)는 fxScale=0이라도 다음 틱에 넘어가므로 기다린다.
     let guard = 0;
     while (room.state.phase !== "round-result" && guard++ < 20) {
       if (room.state.phase === "discussion") room.closeDiscussion();
       else if (room.state.phase === "description") room.startDiscussion();
-      else break;
+      await wait(30);
     }
     expect(room.state.phase).toBe("round-result");
     expect(room.state.roundEndReason).toBe("chances-exhausted");
-    expect(guard).toBeLessThan(10);
+    expect(guard).toBeLessThan(15);
   });
 });

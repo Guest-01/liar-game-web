@@ -1,12 +1,15 @@
 <script lang="ts">
   import { game, nicknameOf, playerList, send } from "../lib/connection.svelte.js";
-  import { DESCRIPTION_MAX } from "../../shared/constants.js";
+  import { DESCRIPTION_MAX, TYPING_MS_PER_CHAR } from "../../shared/constants.js";
   import Timer from "./Timer.svelte";
+  import Typewriter from "../fx/Typewriter.svelte";
 
   let text = $state("");
   const s = $derived(game.snapshot!);
   const currentId = $derived(s.descriptionOrder[s.currentDescriberIndex] ?? "");
-  const myTurn = $derived(currentId === game.mySessionId);
+  const myTurn = $derived(currentId === game.mySessionId && s.phase === "description");
+  // description-reveal 동안 방금 제출된 설명을 한 글자씩 보여준다
+  const revealing = $derived(s.phase === "description-reveal");
 
   function submit(e: Event) {
     e.preventDefault();
@@ -28,7 +31,13 @@
         <span class="text-gray-500 w-6 shrink-0">{i + 1}</span>
         <span class="font-semibold w-24 shrink-0 truncate">{nicknameOf(id)}</span>
         <span class="text-gray-300 flex-1 break-words">
-          {playerList().find((p) => p.id === id)?.description || (i === s.currentDescriberIndex ? "말하는 중…" : "")}
+          {#if revealing && i === s.currentDescriberIndex}
+            <Typewriter text={playerList().find((p) => p.id === id)?.description ?? ""}
+                        msPerChar={TYPING_MS_PER_CHAR} />
+          {:else}
+            {playerList().find((p) => p.id === id)?.description
+              || (i === s.currentDescriberIndex && !revealing ? "말하는 중…" : "")}
+          {/if}
         </span>
       </li>
     {/each}
@@ -42,7 +51,7 @@
              class="flex-1 min-w-0 px-4 py-3 bg-gray-700 rounded-lg outline-hidden focus:ring-2 focus:ring-primary" />
       <button type="submit" class="px-6 py-3 bg-primary rounded-lg font-bold">제출</button>
     </form>
-  {:else}
+  {:else if !revealing}
     <p class="text-center text-gray-400">{nicknameOf(currentId)}님의 차례입니다</p>
   {/if}
 </div>

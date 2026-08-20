@@ -5,6 +5,7 @@ export type GameMode = "normal" | "fool";
 export type Phase =
   | "waiting"
   | "word-check"
+  | "order-reveal"
   | "description"
   | "description-reveal"
   | "discussion"
@@ -18,7 +19,7 @@ export type Phase =
 
 /** 라운드가 진행 중인가 (대기실·결과 화면이 아닌가) */
 export const IN_ROUND_PHASES: ReadonlySet<Phase> = new Set<Phase>([
-  "word-check", "description", "description-reveal",
+  "word-check", "order-reveal", "description", "description-reveal",
   "discussion", "defense", "final-vote", "vote-reveal", "liar-guess",
 ]);
 

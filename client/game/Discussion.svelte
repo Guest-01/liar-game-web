@@ -8,6 +8,24 @@
   const canRedo = $derived(s.descriptionAttempts < 2);
 
   const countFor = (id: string) => playerList().filter((p) => p.nominatedId === id).length;
+
+  // 득표가 늘어난 대상에 짧게 펄스를 준다 (REQUIREMENTS §F9)
+  let pulsing = $state<Record<string, boolean>>({});
+  let prev: Record<string, number> = {};
+
+  $effect(() => {
+    const now: Record<string, number> = {};
+    for (const p of playerList()) {
+      if (p.nominatedId) now[p.nominatedId] = (now[p.nominatedId] ?? 0) + 1;
+    }
+    for (const [id, n] of Object.entries(now)) {
+      if (n > (prev[id] ?? 0)) {
+        pulsing[id] = true;
+        setTimeout(() => { pulsing[id] = false; }, 300);
+      }
+    }
+    prev = now;
+  });
 </script>
 
 <div class="space-y-6">
@@ -35,7 +53,7 @@
                 class="px-3 py-3 rounded-lg text-sm transition-colors disabled:cursor-default
                        {my?.nominatedId === p.id ? 'bg-danger' : 'bg-gray-700 enabled:hover:bg-gray-600'}">
           <span class="block truncate">{p.nickname}</span>
-          <span class="text-xs opacity-70">{countFor(p.id)}표</span>
+          <span class="text-xs opacity-70" class:nomination-pulse={pulsing[p.id]}>{countFor(p.id)}표</span>
         </button>
       {/each}
 
@@ -44,7 +62,7 @@
                 class="px-3 py-3 rounded-lg text-sm transition-colors
                        {my?.nominatedId === REDO_TARGET ? 'bg-warning text-black' : 'bg-gray-700 hover:bg-gray-600'}">
           <span class="block">설명 다시하기</span>
-          <span class="text-xs opacity-70">{countFor(REDO_TARGET)}표</span>
+          <span class="text-xs opacity-70" class:nomination-pulse={pulsing[REDO_TARGET]}>{countFor(REDO_TARGET)}표</span>
         </button>
       {/if}
     </div>

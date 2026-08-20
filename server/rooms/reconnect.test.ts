@@ -12,6 +12,7 @@ import { LiarRoom } from "./LiarRoom.js";
 /** 유예를 1초로 줄인 테스트용 방 */
 class FastGraceRoom extends LiarRoom {
   protected override graceSeconds = 1;
+  protected override fxScale = 0;   // 연출 대기 없이 테스트한다
 }
 
 let colyseus: ColyseusTestServer;

@@ -16,6 +16,8 @@
   import RoundResult from "../game/RoundResult.svelte";
   import Scoreboard from "../game/Scoreboard.svelte";
   import MatchResult from "../game/MatchResult.svelte";
+  import VoteReveal from "../game/VoteReveal.svelte";
+  import OrderReveal from "../fx/OrderReveal.svelte";
   import PauseBanner from "../game/PauseBanner.svelte";
   import SpectatorBanner from "../game/SpectatorBanner.svelte";
 
@@ -38,12 +40,9 @@
 
   const s = $derived(game.snapshot);
   const phase = $derived(s?.phase ?? "waiting");
-  // 연출 페이즈(M1에서는 즉시 통과)는 직전 화면을 그대로 유지한다
-  const view = $derived(
-    phase === "description-reveal" ? "description"
-    : phase === "vote-reveal" ? "final-vote"
-    : phase,
-  );
+  // description-reveal은 설명 화면 위에서 타이핑으로 이어지므로 화면을 유지한다.
+  // order-reveal과 vote-reveal은 자체 화면을 가진다.
+  const view = $derived(phase === "description-reveal" ? "description" : phase);
 
   async function exit() { await leave(); navigate("/"); }
 </script>
@@ -76,10 +75,12 @@
       <div class="lg:col-span-3 flex flex-col gap-6">
         {#if view === "waiting"}<Waiting />
         {:else if view === "word-check"}<WordCheck />
+        {:else if view === "order-reveal"}<OrderReveal />
         {:else if view === "description"}<Description />
         {:else if view === "discussion"}<Discussion />
         {:else if view === "defense"}<Defense />
         {:else if view === "final-vote"}<FinalVote />
+        {:else if view === "vote-reveal"}<VoteReveal />
         {:else if view === "liar-guess"}<LiarGuess />
         {:else if view === "round-result"}<RoundResult />
         {:else if view === "scoreboard"}<Scoreboard />

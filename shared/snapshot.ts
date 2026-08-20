@@ -66,6 +66,9 @@ export type RoomSnapshot = {
   agreeCount: number;
   disagreeCount: number;
   abstainCount: number;
+  executionConfirmed: boolean;
+  /** 처형 확정 시에만 의미가 있다. 미확정이면 항상 false다. */
+  defendantWasLiar: boolean;
 
   players: Record<string, PlayerSnapshot>;
   chat: ChatSnapshot[];

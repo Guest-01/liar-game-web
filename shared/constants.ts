@@ -21,11 +21,22 @@ export const LIAR_GUESS_MS = 15_000;
 // 전원 지목 완료 후 조기 종료까지
 export const ALL_NOMINATED_GRACE_MS = 5_000;
 
-// ── 연출 (M5에서 채운다) ─────────────────────────────
-// M1에서는 0이라 즉시 통과한다. 페이즈 자체는 전이 테이블에 존재하므로
-// M5에서 이 상수만 바꾸면 되고 상태 머신을 다시 짜지 않아도 된다.
-export const DESCRIPTION_REVEAL_MS = 0;   // M5: 3_500
-export const VOTE_REVEAL_MS = 0;          // M5: 12_000
+// ── 연출 (REQUIREMENTS §F9) ──────────────────────────
+// 연출은 부가가 아니라 기능이다. 서버는 페이즈와 남은 시간만 주고
+// 타임라인은 클라이언트가 소유한다.
+
+/** 발언 순서 추첨: 하이라이트가 점점 느려지다 첫 설명자에서 멈춘다 */
+export const ORDER_REVEAL_MS = 2_800;
+
+/** 한줄 설명 타이핑: 글자당 100ms, 총 3초 안에서 남는 시간은 대기 */
+export const DESCRIPTION_REVEAL_MS = 3_500;
+export const TYPING_MS_PER_CHAR = 100;
+
+/** 개표: 찬반을 공개하고 카운트다운 */
+export const VOTE_REVEAL_MS = 5_000;
+
+/** 라이어 공개: "○○님은 라이어가…" 타이핑(1s+0.5s+1s) → 결과 유지(1.5s+) */
+export const LIAR_REVEAL_MS = 7_000;
 
 // ── 기회 상한 (D8) ───────────────────────────────────
 // "시민에게 주어진 기회는 유한하다. 소진하고도 라이어를 처형하지 못하면 라이어 승."

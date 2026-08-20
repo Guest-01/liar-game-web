@@ -17,7 +17,7 @@ import {
 import { IN_ROUND_PHASES, type GameMode, type Phase } from "../../shared/types.js";
 import { logger } from "../logger.js";
 import { assignSecrets, clearSecrets, syncViews } from "./projection.js";
-import { PHASES, phaseAccepts, phaseDuration } from "./phases.js";
+import { FX_PHASES, PHASES, phaseAccepts, phaseDuration } from "./phases.js";
 import { ChatSchema, PlayerSchema, RoomSchema } from "./state.js";
 import { PhaseTimer } from "./timer.js";
 
@@ -40,6 +40,12 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
 
   /** 재접속 유예(초). 테스트에서 줄일 수 있도록 인스턴스 속성으로 둔다. */
   protected graceSeconds: number = RECONNECT_GRACE_SEC;
+
+  /**
+   * 연출 페이즈 길이 배율. 테스트에서 0으로 두면 연출이 즉시 통과한다.
+   * 게임 규칙에는 영향이 없다 — 연출은 보여주기 위한 시간이다.
+   */
+  protected fxScale = 1;
 
   /** 직전 라운드가 무효였는가. 무효면 라운드 수를 소모하지 않는다 (REQUIREMENTS §1.7). */
   private lastRoundVoided = false;
@@ -328,7 +334,8 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     this.state.phase = next;
     this.onEnter(next);
 
-    const ms = phaseDuration(next, this.state);
+    const base = phaseDuration(next, this.state);
+    const ms = FX_PHASES.has(next) ? Math.round(base * this.fxScale) : base;
     if (ms > 0) {
       const delayed = this.clock.setTimeout(() => this.onTimeout(next), ms);
       this.timer.set(delayed, ms);
@@ -357,6 +364,8 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
         this.finalVotes.clear();
         for (const p of this.players()) { p.hasFinalVoted = false; p.myFinalVote = false; }
         this.state.agreeCount = this.state.disagreeCount = this.state.abstainCount = 0;
+        this.state.executionConfirmed = false;
+        this.state.defendantWasLiar = false;
         break;
     }
   }
@@ -365,6 +374,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     if (this.state.phase !== phase) return;   // 이미 다른 곳으로 전이됨
 
     switch (phase) {
+      case "order-reveal":      return this.enterPhase("description");
       case "description":       return this.autoSubmitDescription();
       case "description-reveal": return this.advanceDescriber();
       case "discussion":        return this.closeDiscussion();
@@ -496,7 +506,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     }
     this.state.currentDescriberIndex = 0;
     for (const p of this.players()) p.description = "";
-    this.enterPhase("description");
+    this.enterPhase("order-reveal");   // ⟨연출⟩ 순서 추첨 후 설명으로
   }
 
   private nominate(player: PlayerSchema, targetId: string): void {
@@ -567,12 +577,15 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     this.state.agreeCount = r.agree;
     this.state.disagreeCount = r.disagree;
     this.state.abstainCount = r.abstain;
+    this.state.executionConfirmed = r.confirmed;
+    // ★ 처형이 확정됐을 때만 라이어 여부를 공개한다.
+    //   미확정이면 라운드가 계속되므로 채우면 정체가 샌다.
+    this.state.defendantWasLiar = r.confirmed && this.state.defendantId === this.secret?.liarId;
     this.enterPhase("vote-reveal");
   }
 
   private afterVoteReveal(): void {
-    const confirmed = this.state.agreeCount > (this.state.agreeCount + this.state.disagreeCount) / 2
-      && this.state.agreeCount + this.state.disagreeCount > 0;
+    const confirmed = this.state.executionConfirmed;
     const defendantIsLiar = this.state.defendantId === this.secret?.liarId;
     const attempts = {
       description: this.state.descriptionAttempts,

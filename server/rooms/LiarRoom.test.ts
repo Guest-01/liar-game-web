@@ -2,13 +2,18 @@ import { ColyseusTestServer, boot } from "@colyseus/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Server } from "colyseus";
 import { LiarRoom } from "./LiarRoom.js";
+
+/** 연출 대기 없이 규칙만 검증하기 위한 테스트용 방 */
+class NoFxRoom extends LiarRoom {
+  protected override fxScale = 0;
+}
 import { REDO_TARGET } from "../../shared/constants.js";
 
 let colyseus: ColyseusTestServer;
 
 beforeAll(async () => {
   colyseus = await boot({
-    initializeGameServer: (gs: Server) => { gs.define("liar", LiarRoom); },
+    initializeGameServer: (gs: Server) => { gs.define("liar", NoFxRoom); },
   } as any);
 });
 afterAll(async () => { await colyseus.shutdown(); });
