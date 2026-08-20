@@ -2,8 +2,10 @@
   import { game, isHost, playerList, send } from "../lib/connection.svelte.js";
   import {
     DEFENSE_TIME_OPTIONS, DESCRIPTION_TIME_OPTIONS, DISCUSSION_TIME_OPTIONS,
-    MAX_PLAYERS, MIN_PLAYERS,
+    MAX_PLAYERS, MIN_PLAYERS, ROUND_COUNT_OPTIONS,
   } from "../../shared/constants.js";
+
+  const roundLabel = (v: number) => (v === 0 ? "무제한" : `${v}판`);
   import { RANDOM_CATEGORY } from "../../shared/rules.js";
 
   let categories = $state<string[]>([]);
@@ -29,6 +31,7 @@
     {#if !isHost()}
       <div class="flex flex-wrap gap-4 text-sm text-gray-400">
         <span>모드: <span class="text-white">{s.gameMode === "normal" ? "일반" : "바보"}</span></span>
+        <span>라운드: <span class="text-white">{roundLabel(s.totalRounds)}</span></span>
         <span>카테고리: <span class="text-white">{s.category}</span></span>
         <span>최대: <span class="text-white">{s.maxPlayers}명</span></span>
         <span>설명: <span class="text-white">{s.descriptionTime}초</span></span>
@@ -43,6 +46,18 @@
             {#each [["normal", "일반"], ["fool", "바보"]] as [v, label] (v)}
               <button onclick={() => set({ gameMode: v })}
                       class="w-24 py-2 rounded-lg text-sm {s.gameMode === v ? 'bg-primary' : 'bg-gray-700 hover:bg-gray-600'}">{label}</button>
+            {/each}
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-4">
+          <span class="text-sm text-gray-400 w-20">라운드 수</span>
+          <div class="flex gap-2">
+            {#each ROUND_COUNT_OPTIONS as v (v)}
+              <button onclick={() => set({ totalRounds: v })}
+                      class="w-16 py-1.5 rounded text-xs {s.totalRounds === v ? 'bg-primary' : 'bg-gray-700 hover:bg-gray-600'}">
+                {roundLabel(v)}
+              </button>
             {/each}
           </div>
         </div>

@@ -14,6 +14,8 @@
   import FinalVote from "../game/FinalVote.svelte";
   import LiarGuess from "../game/LiarGuess.svelte";
   import RoundResult from "../game/RoundResult.svelte";
+  import Scoreboard from "../game/Scoreboard.svelte";
+  import MatchResult from "../game/MatchResult.svelte";
   import PauseBanner from "../game/PauseBanner.svelte";
   import SpectatorBanner from "../game/SpectatorBanner.svelte";
 
@@ -55,7 +57,9 @@
     <header class="border-b border-gray-800 px-4 py-3 flex items-center gap-3">
       <h1 class="text-lg font-bold truncate flex-1">{s.name}</h1>
       {#if s.round > 0}
-        <span class="text-sm text-gray-400 shrink-0">라운드 {s.round}</span>
+        <span class="text-sm text-gray-400 shrink-0">
+          라운드 {s.round}{s.totalRounds > 0 ? ` / ${s.totalRounds}` : ""}
+        </span>
       {/if}
       {#if me() && !me()!.amILiar && me()!.myWord}
         <span class="text-sm shrink-0">제시어: <span class="text-primary font-semibold">{me()!.myWord}</span></span>
@@ -78,6 +82,8 @@
         {:else if view === "final-vote"}<FinalVote />
         {:else if view === "liar-guess"}<LiarGuess />
         {:else if view === "round-result"}<RoundResult />
+        {:else if view === "scoreboard"}<Scoreboard />
+        {:else if view === "match-result"}<MatchResult />
         {/if}
       </div>
 

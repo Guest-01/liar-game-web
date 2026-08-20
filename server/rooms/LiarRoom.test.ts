@@ -216,12 +216,14 @@ describe("라운드 흐름", () => {
     expect(r.s().players.get(c1.sessionId).nominatedId).toBe("");
   });
 
-  it("결과에서 대기실로 돌아가면 비밀이 모두 지워진다", async () => {
+  it("매치를 마치고 대기실로 돌아가면 비밀이 모두 지워진다", async () => {
     const r = await started();
+    (r.room as any).state.totalRounds = 1;      // 1라운드 매치
     (r.room as any).endRound("citizen", "liar-executed-wrong-guess");
     await tick(r.room);
-    r.clients[0]!.send("next-round", {});
-    await tick(r.room);
+
+    // round-result → scoreboard → match-result → waiting (M4)
+    for (let i = 0; i < 3; i++) { r.clients[0]!.send("next-round", {}); await tick(r.room, 3); }
     expect(r.s().phase).toBe("waiting");
     expect(r.s().revealedLiarId).toBe("");
     for (const c of r.clients) {

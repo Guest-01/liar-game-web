@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   RANDOM_CATEGORY, categoryNames, decideAfterDiscussion, decideAfterFinalVote,
   decideAfterLiarGuess, isGuessCorrect, isValidCategory, makeDescriptionOrder,
-  normalizeWord, pickLiar, pickWords, resolveCategory, tallyFinalVote,
+  isMatchOver, normalizeWord, pickLiar, pickWords, rank, resolveCategory, scoreRound, tallyFinalVote,
   tallyNominations, wordFor, canStartMatch,
 } from "./rules.js";
 import { shuffle } from "./random.js";
@@ -267,5 +267,72 @@ describe("라운드 종료 보장 (체크리스트 F4) — 무한 루프 부재"
       expect(steps).toBeLessThan(5);
       expect(phase).toBe("round-result");
     }
+  });
+});
+
+describe("점수 (D4)", () => {
+  const ids = ["L", "c1", "c2", "c3"];
+  const nom = (o: Record<string, string>) => new Map(Object.entries(o));
+  const score = (winner: "citizen" | "liar" | null, nominations = nom({})) =>
+    scoreRound({ winner, liarId: "L", playerIds: ids, nominations });
+
+  it("라이어 승: 라이어만 +2", () => {
+    expect(Object.fromEntries(score("liar")))
+      .toEqual({ L: 2, c1: 0, c2: 0, c3: 0 });
+  });
+
+  it("시민 승: 시민 전원 +1, 라이어는 0", () => {
+    expect(Object.fromEntries(score("citizen")))
+      .toEqual({ L: 0, c1: 1, c2: 1, c3: 1 });
+  });
+
+  it("정확 지목 보너스는 승패와 무관하게 붙는다", () => {
+    // 라이어가 이겼어도 라이어를 지목했던 시민은 +1
+    expect(Object.fromEntries(score("liar", nom({ c1: "L", c2: "c3" }))))
+      .toEqual({ L: 2, c1: 1, c2: 0, c3: 0 });
+    // 시민 승이면 기본 +1에 보너스 +1이 더해진다
+    expect(Object.fromEntries(score("citizen", nom({ c1: "L", c2: "c3" }))))
+      .toEqual({ L: 0, c1: 2, c2: 1, c3: 1 });
+  });
+
+  it("무효 라운드는 전원 0", () => {
+    expect(Object.fromEntries(score(null, nom({ c1: "L" }))))
+      .toEqual({ L: 0, c1: 0, c2: 0, c3: 0 });
+  });
+
+  it("이미 나간 사람의 지목은 무시된다", () => {
+    const d = scoreRound({
+      winner: "citizen", liarId: "L", playerIds: ids,
+      nominations: nom({ 나간사람: "L", c1: "L" }),
+    });
+    expect(d.has("나간사람")).toBe(false);
+    expect(d.get("c1")).toBe(2);
+  });
+
+  it("라이어 자신의 지목에는 보너스가 붙지 않는다", () => {
+    // 자기 자신 지목은 애초에 막히지만, 규칙 차원에서도 방어한다
+    expect(score("liar", nom({ L: "L" })).get("L")).toBe(2);
+  });
+});
+
+describe("매치 종료 판정", () => {
+  it("totalRounds에 도달하면 끝난다", () => {
+    expect(isMatchOver(2, 3)).toBe(false);
+    expect(isMatchOver(3, 3)).toBe(true);
+  });
+  it("0은 무제한이다", () => {
+    expect(isMatchOver(99, 0)).toBe(false);
+  });
+});
+
+describe("순위", () => {
+  it("점수 내림차순으로 정렬한다", () => {
+    const r = rank([{ id: "a", score: 1 }, { id: "b", score: 5 }, { id: "c", score: 3 }]);
+    expect(r.map((p) => p.id)).toEqual(["b", "c", "a"]);
+    expect(r.map((p) => p.place)).toEqual([1, 2, 3]);
+  });
+  it("동점은 같은 등수를 받고 다음 등수를 건너뛴다", () => {
+    const r = rank([{ id: "a", score: 5 }, { id: "b", score: 5 }, { id: "c", score: 1 }]);
+    expect(r.map((p) => p.place)).toEqual([1, 1, 3]);
   });
 });

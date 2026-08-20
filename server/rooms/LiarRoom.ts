@@ -11,8 +11,8 @@ import {
 import { MESSAGE_SCHEMAS, type MessageType, CreateOptions, JoinOptions } from "../../shared/protocol.js";
 import {
   canRediscuss, canStartMatch, decideAfterDiscussion, decideAfterFinalVote, decideAfterLiarGuess,
-  isGuessCorrect, isValidCategory, makeDescriptionOrder, pickLiar, pickWords,
-  resolveCategory, tallyFinalVote, tallyNominations, wordFor,
+  isGuessCorrect, isMatchOver, isValidCategory, makeDescriptionOrder, pickLiar, pickWords,
+  resolveCategory, scoreRound, tallyFinalVote, tallyNominations, wordFor,
 } from "../../shared/rules.js";
 import { IN_ROUND_PHASES, type GameMode, type Phase } from "../../shared/types.js";
 import { logger } from "../logger.js";
@@ -40,6 +40,12 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
 
   /** 재접속 유예(초). 테스트에서 줄일 수 있도록 인스턴스 속성으로 둔다. */
   protected graceSeconds: number = RECONNECT_GRACE_SEC;
+
+  /** 직전 라운드가 무효였는가. 무효면 라운드 수를 소모하지 않는다 (REQUIREMENTS §1.7). */
+  private lastRoundVoided = false;
+
+  /** 점수 계산에 쓸 "그 라운드의 마지막 지목". 토론이 재시작돼도 마지막 것만 남는다. */
+  private lastNominations = new Map<string, string>();
 
   // ───────────────────────────────────────────────────────────
   // 생명주기
@@ -276,7 +282,12 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
         if (hostOnly()) this.kick((data as { targetId: string }).targetId, client.sessionId);
         break;
       case "start-match":
-        if (hostOnly() && canStartMatch(this.playerCount())) this.startRound();
+        if (hostOnly() && canStartMatch(this.playerCount())) {
+          this.state.round = 0;
+          for (const p of this.players()) { p.score = 0; p.roundDelta = 0; }
+          this.lastRoundVoided = false;
+          this.startRound();
+        }
         break;
       case "check-word":
         this.checkWord(player);
@@ -300,7 +311,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
         this.liarGuess(player, (data as { text: string }).text);
         break;
       case "next-round":
-        if (hostOnly()) this.backToLobby();
+        if (hostOnly()) this.advanceMatch();
         break;
       case "skip-wait":
         if (hostOnly()) this.skipWait();
@@ -405,6 +416,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     if (advanceRound) this.state.round += 1;
     this.state.descriptionAttempts = 0;
     this.state.discussionAttempts = 0;
+    this.lastNominations.clear();
     this.state.descriptionOrder = new ArraySchema<string>(...makeDescriptionOrder(ids));
     this.clearRoundResult();
 
@@ -513,6 +525,8 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   }
 
   private closeDiscussion(): void {
+    // 점수의 "정확 지목 보너스"는 그 라운드의 마지막 지목 기준이다
+    this.lastNominations = new Map(this.nominations);
     const attempts = {
       description: this.state.descriptionAttempts,
       discussion: this.state.discussionAttempts,
@@ -587,6 +601,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   }
 
   private endRound(winner: "citizen" | "liar", reason: string): void {
+    const liarId = this.secret?.liarId ?? "";
     if (this.secret) {
       // ★ 라이어 정체와 제시어가 state에 들어가는 유일한 시점 ★
       this.state.revealedLiarId = this.secret.liarId;
@@ -596,8 +611,25 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     this.state.roundWinner = winner;
     this.state.roundEndReason = reason;
     this.secret = null;
+    this.lastRoundVoided = false;
+    this.applyScores(winner, liarId);
     this.enterPhase("round-result");
     logger.info({ roomId: this.roomId, winner, reason }, "라운드 종료");
+  }
+
+  /** 라운드 점수를 누적한다. 무효 라운드는 winner=null로 넘겨 전원 0이 된다. */
+  private applyScores(winner: "citizen" | "liar" | null, liarId: string): void {
+    const players = this.players();
+    const delta = scoreRound({
+      winner,
+      liarId,
+      playerIds: players.map((p) => p.id),
+      nominations: this.lastNominations,
+    });
+    for (const p of players) {
+      p.roundDelta = delta.get(p.id) ?? 0;
+      p.score += p.roundDelta;
+    }
   }
 
   private voidRound(message: string): void {
@@ -610,10 +642,43 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     this.state.roundWinner = "";
     this.state.roundEndReason = "voided";
     this.secret = null;
+    this.lastRoundVoided = true;      // 라운드 수를 소모하지 않는다
+    this.applyScores(null, "");        // 전원 0 (roundDelta도 0으로 초기화된다)
     this.enterPhase("round-result");
   }
 
-  /** M1은 1라운드 완결이므로 결과에서 대기실로 돌아간다. 연속 라운드는 M4. */
+  /**
+   * 호스트가 "다음"을 눌렀을 때의 매치 흐름.
+   *
+   *   round-result → scoreboard → 다음 라운드 | match-result → waiting
+   */
+  private advanceMatch(): void {
+    switch (this.state.phase) {
+      case "round-result":
+        this.promoteSpectators();          // 점수판에 이미 참가자로 보인다
+        this.enterPhase("scoreboard");
+        return;
+
+      case "scoreboard":
+        if (this.lastRoundVoided) {
+          // 무효 라운드는 라운드 수를 소모하지 않는다 — 같은 번호로 다시
+          this.startRound(false);
+          return;
+        }
+        if (isMatchOver(this.state.round, this.state.totalRounds)) {
+          this.enterPhase("match-result");
+          return;
+        }
+        this.startRound(true);
+        return;
+
+      case "match-result":
+        this.backToLobby();
+        return;
+    }
+  }
+
+  /** 매치를 끝내고 대기실로. 점수를 초기화한다. */
   private backToLobby(): void {
     this.promoteSpectators();
     clearSecrets(this.players());
@@ -626,7 +691,10 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     this.finalVotes.clear();
     for (const p of this.players()) {
       p.hasCheckedWord = false; p.description = ""; p.nominatedId = ""; p.hasFinalVoted = false;
+      p.score = 0; p.roundDelta = 0;
     }
+    this.lastRoundVoided = false;
+    this.lastNominations.clear();
     this.enterPhase("waiting");
   }
 

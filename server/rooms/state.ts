@@ -12,6 +12,7 @@ export class PlayerSchema extends Schema {
   @type("boolean") isConnected = true;
   @type("boolean") isSpectator = false;
   @type("uint16")  score = 0;
+  @type("int8")    roundDelta = 0;   // 직전 라운드 점수 변동 (점수판 표시용)
   @type("boolean") hasCheckedWord = false;
   @type("string")  description = "";
   @type("string")  nominatedId = "";

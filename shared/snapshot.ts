@@ -17,6 +17,7 @@ export type PlayerSnapshot = {
   isConnected: boolean;
   isSpectator: boolean;
   score: number;
+  roundDelta: number;
   hasCheckedWord: boolean;
   description: string;      // 제출된 한줄 설명
   nominatedId: string;      // 지목 대상 ("" = 미지목)

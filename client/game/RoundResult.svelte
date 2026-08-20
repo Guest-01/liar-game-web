@@ -46,8 +46,8 @@
 
   {#if isHost()}
     <button onclick={() => send("next-round")}
-            class="px-8 py-4 bg-gradient-to-r from-primary to-secondary rounded-xl font-bold">대기실로 돌아가기</button>
+            class="px-8 py-4 bg-gradient-to-r from-primary to-secondary rounded-xl font-bold">점수판 보기</button>
   {:else}
-    <p class="text-gray-400">호스트가 대기실로 돌아가기를 기다리는 중…</p>
+    <p class="text-gray-400">호스트가 넘기기를 기다리는 중…</p>
   {/if}
 </div>

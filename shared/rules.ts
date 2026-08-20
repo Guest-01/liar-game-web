@@ -8,6 +8,9 @@ import {
   MAX_DISCUSSION_ATTEMPTS,
   MIN_PLAYERS,
   REDO_TARGET,
+  SCORE_CITIZEN_WIN,
+  SCORE_CORRECT_NOMINATION,
+  SCORE_LIAR_WIN,
 } from "./constants.js";
 import type { GameMode, Phase, RoundEndReason, RoundWinner } from "./types.js";
 
@@ -234,4 +237,76 @@ export function decideAfterLiarGuess(correct: boolean): NextStep {
   return correct
     ? { phase: "round-result", winner: "liar", reason: "liar-executed-right-guess" }
     : { phase: "round-result", winner: "citizen", reason: "liar-executed-wrong-guess" };
+}
+
+// ─────────────────────────────────────────────────────────────
+// 점수 (D4)
+// ─────────────────────────────────────────────────────────────
+
+export type RoundScoreInput = {
+  /** null이면 무효 라운드 — 아무도 점수를 얻지 않는다 */
+  winner: RoundWinner | null;
+  liarId: string;
+  /** 그 라운드에 참여한 플레이어 (관전자 제외) */
+  playerIds: readonly string[];
+  /** 그 라운드에서 **마지막으로 실시된 지목**. voterId → targetId */
+  nominations: ReadonlyMap<string, string>;
+};
+
+/**
+ * 라운드 점수 변동을 계산한다. playerId → 증가분.
+ *
+ *   라이어 승 (미검거 또는 검거 후 정답)  라이어 +2
+ *   시민 승   (검거 후 오답)              시민 전원 +1
+ *   정확 지목 보너스                      라이어를 지목한 시민 +1 (승패 무관)
+ *   무효 라운드                           전원 0
+ *
+ * 라이어가 +2인 근거: 각자 라이어가 되는 횟수는 확률적으로 같으므로 공정 조건은
+ * `라이어 점수 = 시민 점수 × (1−p)/p` (p = 라이어 승률)이다. 텍스트 기반
+ * 라이어 게임은 라이어가 다소 불리하다.
+ * **플레이 후 조정할 수 있게 상수로 분리해 두었다.**
+ *
+ * 정확 지목 보너스는 "아무나 찍기"를 억제한다.
+ */
+export function scoreRound(input: RoundScoreInput): Map<string, number> {
+  const delta = new Map<string, number>();
+  for (const id of input.playerIds) delta.set(id, 0);
+  if (input.winner === null) return delta;   // 무효
+
+  const bump = (id: string, n: number) => {
+    if (delta.has(id)) delta.set(id, delta.get(id)! + n);
+  };
+
+  if (input.winner === "liar") {
+    bump(input.liarId, SCORE_LIAR_WIN);
+  } else {
+    for (const id of input.playerIds) {
+      if (id !== input.liarId) bump(id, SCORE_CITIZEN_WIN);
+    }
+  }
+
+  // 정확 지목 보너스 — 승패와 무관하다
+  for (const [voterId, targetId] of input.nominations) {
+    if (voterId !== input.liarId && targetId === input.liarId) {
+      bump(voterId, SCORE_CORRECT_NOMINATION);
+    }
+  }
+  return delta;
+}
+
+/** 매치가 끝났는가. totalRounds가 0이면 무제한이다. */
+export function isMatchOver(round: number, totalRounds: number): boolean {
+  return totalRounds > 0 && round >= totalRounds;
+}
+
+/** 점수 내림차순 순위. 동점은 같은 등수를 받는다. */
+export function rank<T extends { id: string; score: number }>(
+  players: readonly T[],
+): Array<T & { place: number }> {
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  let place = 0, prev = Number.NaN;
+  return sorted.map((p, i) => {
+    if (p.score !== prev) { place = i + 1; prev = p.score; }
+    return { ...p, place };
+  });
 }
