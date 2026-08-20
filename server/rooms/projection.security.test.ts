@@ -134,6 +134,47 @@ describe("정보 은닉 — 바이트 수준 (배포 게이트)", () => {
     }
   });
 
+  /**
+   * ★ 연속 라운드 — 위 테스트들이 못 보던 자리.
+   *
+   * 다른 테스트는 매번 새 방에서 한 라운드만 본다. 그래서 "1라운드 결과에서
+   * **정당하게** 공개된 값이 2라운드까지 남아있는가"를 아무도 확인하지 않았다.
+   * 서버가 보낸 바이트만 보는 검사로도 잡히지 않는다 — 이미 보낸 바이트는
+   * 정당했고, 문제는 그것이 **거둬들여지지 않는 것**이기 때문이다.
+   *
+   * 봇 하니스(scripts/bots.mjs)의 불변식 감시가 실제로 여기서 걸렸다.
+   */
+  it("★ 다음 라운드가 시작되면 이전 라운드의 공개가 스냅샷에서 사라진다", async () => {
+    const { room, clients } = await setupRound("normal");
+
+    (room as any).endRound("citizen", "liar-executed-wrong-guess");
+    await room.waitForNextPatch();
+    await room.waitForNextPatch();
+    // 결과 화면에서는 보이는 게 맞다
+    expect((clients[0]!.state as any).toJSON().revealedCitizenWord).toBeTruthy();
+
+    // round-result → scoreboard → 2라운드 word-check
+    for (let i = 0; i < 2; i++) {
+      clients[0]!.send("next-round", {});
+      await room.waitForNextPatch();
+      await room.waitForNextPatch();
+    }
+    expect((room as any).state.round).toBe(2);
+    expect((room as any).state.phase).toBe("word-check");
+
+    for (const c of clients) {
+      const snap: any = (c.state as any).toJSON();
+      expect(snap.revealedCitizenWord, `${c.sessionId}에게 이전 제시어가 남았다`).toBe("");
+      expect(snap.revealedLiarId, `${c.sessionId}에게 이전 라이어가 남았다`).toBe("");
+
+      for (const [sid, p] of Object.entries<any>(snap.players)) {
+        if (sid === c.sessionId) continue;
+        expect(p.myWord ?? "", `${c.sessionId}가 보는 ${sid}의 myWord`).toBe("");
+        expect(p.amILiar ?? false, `${c.sessionId}가 보는 ${sid}의 amILiar`).toBe(false);
+      }
+    }
+  });
+
   it("결과 공개 후에는 전원이 라이어와 제시어를 본다", async () => {
     const { room, clients, secret } = await setupRound("normal");
 

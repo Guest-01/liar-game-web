@@ -1,6 +1,5 @@
 import { StateView } from "@colyseus/schema";
 import type { Client } from "colyseus";
-import { REVEAL_PHASES, type Phase } from "../../shared/types.js";
 import type { PlayerSchema, RoomSchema } from "./state.js";
 
 /**
@@ -12,7 +11,15 @@ import type { PlayerSchema, RoomSchema } from "./state.js";
  *   플레이어(타인)  공개 정보만
  *   관전자          공개 정보만. **제시어도 보이지 않는다.**
  *
- * 결과 공개 페이즈에서는 전원의 Player를 모든 뷰에 담아 일괄 공개한다.
+ * **뷰는 어떤 페이즈에서도 넓어지지 않는다.** 라운드 결과 공개는 개인 `@view`
+ * 필드가 아니라 방 수준 필드(`revealedLiarId`·`revealedCitizenWord`·
+ * `revealedLiarWord`)로 한다. 그 필드들은 뷰와 무관하게 전원에게 전달되고,
+ * 결과 화면(`client/game/RoundResult.svelte`)도 그것만 쓴다.
+ *
+ * ⚠️ 결과 공개 때 전원의 Player를 뷰에 담던 시절이 있었는데, 그렇게 하면
+ * **다음 라운드까지 남의 제시어가 클라이언트에 남는다.** StateView에서 빠지는 것은
+ * "값을 지워라"가 아니라 "더 이상 업데이트를 보내지 않는다"는 뜻이기 때문이다.
+ * (체크리스트 G13 — 봇 하니스의 불변식 감시가 잡았다)
  *
  * 이 규칙이 지켜지는지는 projection.security.test.ts가 **바이트 수준으로** 검증하며,
  * 그 테스트는 배포 게이트다.
@@ -21,21 +28,11 @@ export function syncViews(
   clients: readonly Client[],
   state: RoomSchema,
 ): void {
-  const revealed = REVEAL_PHASES.has(state.phase as Phase);
-  const everyone = revealed ? [...state.players.values()] : null;
-
   for (const client of clients) {
     const view = new StateView();
-
-    if (everyone) {
-      // 결과 공개: 관전자를 포함한 전원이 모든 제시어를 본다
-      for (const p of everyone) view.add(p);
-    } else {
-      const me = state.players.get(client.sessionId);
-      // 관전자는 아무것도 담지 않는다 → 어떤 제시어도 보지 못한다
-      if (me && !me.isSpectator) view.add(me);
-    }
-
+    const me = state.players.get(client.sessionId);
+    // 관전자는 아무것도 담지 않는다 → 어떤 제시어도 보지 못한다
+    if (me && !me.isSpectator) view.add(me);
     client.view = view;
   }
 }
