@@ -11,7 +11,7 @@ import { logger } from "./logger.js";
 import { categoryNames } from "../shared/rules.js";
 import type { LobbyRoom } from "../shared/snapshot.js";
 
-const PORT = Number(process.env.PORT ?? 3000);
+const PORT = Number(process.env.PORT ?? 2567);
 const BASE_URL = process.env.BASE_URL ?? "https://liar-game.guest-01.dev";
 const IS_PROD = process.env.NODE_ENV === "production";
 
@@ -80,7 +80,18 @@ gameServer.define("liar", LiarRoom);
 
 // ⚠️ setTransport()가 Server.listen() 안에서 실행된다. httpServer를 직접
 //    listen하면 매치메이킹이 죽는다. (체크리스트 G3)
-await gameServer.listen(PORT);
+try {
+  await gameServer.listen(PORT);
+} catch (err) {
+  if ((err as NodeJS.ErrnoException).code === "EADDRINUSE") {
+    // 여기서 다음 포트로 넘어가지 않는다. 개발에서는 scripts/dev.mjs가 미리
+    // 빈 포트를 정해 Vite 프록시와 값을 맞추고, 프로덕션에서는 포트가 컨테이너
+    // 포트 매핑과 묶여 있어 임의로 바뀌면 외부에서 닿지 못한다.
+    logger.error(`포트 ${PORT}이 이미 사용 중입니다. PORT 환경변수로 바꾸세요.`);
+    process.exit(1);
+  }
+  throw err;
+}
 logger.info({ port: PORT, prod: IS_PROD }, `🎮 라이어 게임 v2 서버 http://localhost:${PORT}`);
 
 const shutdown = async () => {

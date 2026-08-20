@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "concurrently -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev": "node scripts/dev.mjs",
     "dev:server": "tsx watch --env-file-if-exists=.env server/index.ts",
     "dev:client": "vite",
     "build": "npm run build:client && npm run build:server",

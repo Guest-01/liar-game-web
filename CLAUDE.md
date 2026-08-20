@@ -15,7 +15,7 @@
 
 ```
 npm install
-npm run dev        # 서버 3000 + Vite 5173 → http://localhost:5173
+npm run dev        # 빈 포트를 찾아 서버+Vite를 함께 띄운다 (기본 2567)
 npm test           # 139개 (정보 은닉 바이트 테스트 포함)
 npm run typecheck  # tsc --noEmit + svelte-check
 npm run build      # dist/{server,shared,public}

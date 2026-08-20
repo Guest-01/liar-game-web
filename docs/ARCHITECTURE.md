@@ -174,16 +174,27 @@ const _contract: RoomSnapshot = null as unknown as ReturnType<RoomSchema["toJSON
 
 ```
 build          vite build && tsc -p tsconfig.server.json
-dev            vite (5173) + tsx watch server/index.ts (3000) 동시 실행
+dev            scripts/dev.mjs — 빈 포트를 정한 뒤 vite + tsx watch를 함께 띄운다
 typecheck      tsc -p tsconfig.server.json --noEmit && svelte-check
 test           vitest run
 ```
 
 > ### ⚠️ 개발 모드에만 프록시가 있다
-> Vite dev(5173)와 Colyseus(3000)가 별도 포트이므로 `vite.config.ts`의 `server.proxy`가
+> Vite dev와 Colyseus가 별도 포트이므로 `vite.config.ts`의 `server.proxy`가
 > 매치메이킹 HTTP와 WebSocket 업그레이드를 중계한다.
 > **프로덕션은 같은 오리진이라 프록시가 없다.**
 > 이 차이를 잊으면 "로컬은 되는데 배포하면 안 됨"이 발생한다.
+
+> ### 포트는 오케스트레이터가 정한다
+> 기본 포트는 **2567**이다 (3000은 다른 개발 도구와 너무 자주 겹친다).
+> `scripts/dev.mjs`가 **양쪽이 시작되기 전에** 빈 포트를 찾아 서버와 Vite에
+> 같은 값을 넘긴다.
+>
+> **서버가 스스로 다음 포트로 넘어가게 두지 않는다.** 그러면 Vite 프록시가
+> 옛 포트를 계속 가리켜 "서버는 떴는데 화면이 아무것도 안 되는" 상태가 되고,
+> 프록시는 프로덕션에 없는 개발 전용 배선이라 원인을 찾기 어렵다.
+> 프로덕션에서도 포트가 컨테이너 포트 매핑과 묶여 있으므로 임의로 바뀌면
+> 외부에서 닿지 못한다 — 둘 다 점유 시 **즉시 실패**한다.
 
 ---
 
