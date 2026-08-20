@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { game, me, nicknameOf, playerList, send } from "../lib/connection.svelte.js";
+  import { amSpectator, game, me, nicknameOf, playerList, send } from "../lib/connection.svelte.js";
   import Timer from "./Timer.svelte";
 
   const s = $derived(game.snapshot!);
@@ -17,7 +17,9 @@
 
   <p class="text-lg"><span class="font-bold">{nicknameOf(s.defendantId)}</span>님을 라이어로 지목하시겠습니까?</p>
 
-  {#if amDefendant}
+  {#if amSpectator()}
+    <p class="text-gray-400">관전 중에는 투표할 수 없습니다</p>
+  {:else if amDefendant}
     <p class="text-gray-400">피고는 투표할 수 없습니다</p>
   {:else if my?.hasFinalVoted}
     <p class="text-success">투표 완료 — {my.myFinalVote ? "찬성" : "반대"}</p>

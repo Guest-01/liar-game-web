@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { game, me, playerList, send } from "../lib/connection.svelte.js";
+  import { amSpectator, game, me, playerList, send } from "../lib/connection.svelte.js";
 
   let revealed = $state(false);
   const s = $derived(game.snapshot!);
@@ -8,6 +8,12 @@
 </script>
 
 <div class="text-center py-12">
+  {#if amSpectator()}
+    <!-- 관전자에게는 제시어가 전송되지도 않는다. 화면에도 자리를 만들지 않는다. -->
+    <h2 class="text-2xl font-bold mb-2">제시어 확인 중</h2>
+    <p class="text-sm text-gray-400 mb-8">주제: <span class="text-white font-semibold">{s.category}</span></p>
+    <p class="text-gray-400">참가자들이 제시어를 확인하고 있습니다 ({checkedCount}/{playerList().length})</p>
+  {:else}
   <h2 class="text-2xl font-bold mb-2">당신의 제시어</h2>
   <p class="text-sm text-gray-400 mb-8">주제: <span class="text-white font-semibold">{s.category}</span></p>
 
@@ -37,5 +43,6 @@
         <p class="text-gray-400">다른 참가자를 기다리는 중… ({checkedCount}/{playerList().length})</p>
       {/if}
     </div>
+  {/if}
   {/if}
 </div>

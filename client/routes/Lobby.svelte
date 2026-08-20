@@ -101,9 +101,14 @@
           {#each rooms as room (room.roomId)}
             <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 flex justify-between items-center gap-4">
               <div class="min-w-0 flex-1">
-                <h3 class="font-semibold truncate">
+                <h3 class="font-semibold truncate flex items-center gap-2">
                   {#if !room.isPublic}<span title="비공개">🔒</span>{/if}
-                  {room.name}
+                  <span class="truncate">{room.name}</span>
+                  {#if room.canSpectate}
+                    <span class="shrink-0 px-2 py-0.5 rounded-full bg-secondary/30 text-secondary text-xs font-medium">
+                      👁 관전 가능
+                    </span>
+                  {/if}
                 </h3>
                 <div class="flex flex-wrap gap-x-3 mt-1.5 text-xs text-gray-400">
                   <span>{room.playerCount}/{room.maxPlayers}명</span>
@@ -112,7 +117,10 @@
                 </div>
               </div>
               <button onclick={() => enter(room)}
-                      class="px-4 py-2 bg-primary hover:bg-primary/80 rounded-lg font-semibold text-sm shrink-0">참가</button>
+                      class="px-4 py-2 rounded-lg font-semibold text-sm shrink-0
+                             {room.canSpectate ? 'bg-secondary hover:bg-secondary/80' : 'bg-primary hover:bg-primary/80'}">
+                {room.canSpectate ? "관전하기" : "참가"}
+              </button>
             </div>
           {/each}
         </div>

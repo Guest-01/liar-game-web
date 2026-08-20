@@ -60,7 +60,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     this.state.defenseTime = DEFAULT_DEFENSE_TIME;
     this.password = opts.isPublic ? null : (opts.password ?? null);
 
-    this.setMetadata({ name: opts.roomName, isPublic: opts.isPublic });
+    this.syncMetadata();
     this.registerMessages();
     this.enterPhase("waiting");
   }
@@ -75,12 +75,15 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     for (const p of this.state.players.values()) {
       if (p.nickname === nick) throw new Error("이미 같은 닉네임이 사용 중입니다.");
     }
-    // M1: 게임 중 입장 불가. 관전은 M3.
-    if (IN_ROUND_PHASES.has(this.state.phase as Phase)) {
-      throw new Error("게임이 진행 중입니다.");
-    }
-    if (this.playerCount() >= this.state.maxPlayers) {
-      throw new Error("방이 가득 찼습니다.");
+    // 라운드 중이면 관전자로 받는다.
+    // ★ 불변식: 플레이어 + 관전자 ≤ 최대 인원 (D11)
+    //   이 덕분에 다음 라운드에서 관전자를 전원 승격시켜도 정원을 넘지 않는다.
+    if (this.occupancy() >= this.state.maxPlayers) {
+      throw new Error(
+        IN_ROUND_PHASES.has(this.state.phase as Phase)
+          ? "관전 자리가 없습니다."
+          : "방이 가득 찼습니다.",
+      );
     }
     return true;
   }
@@ -90,10 +93,16 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     const p = new PlayerSchema();
     p.id = client.sessionId;      // ★ 플레이어 정체성은 sessionId다. socket이 아니다.
     p.nickname = nickname;
-    p.isHost = this.state.players.size === 0;
+    p.isSpectator = IN_ROUND_PHASES.has(this.state.phase as Phase);
+    // 관전자는 호스트가 될 수 없다
+    p.isHost = !p.isSpectator && this.playerCount() === 0;
     this.state.players.set(client.sessionId, p);
 
-    this.system(`${nickname}님이 입장했습니다`);
+    this.system(
+      p.isSpectator
+        ? `${nickname}님이 관전을 시작했습니다`
+        : `${nickname}님이 입장했습니다`,
+    );
     this.refresh();
     logger.info({ roomId: this.roomId, nickname }, "입장");
   }
@@ -106,7 +115,9 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     const p = this.state.players.get(client.sessionId);
     if (!p) return;
 
-    if (consented) {
+    // 관전자는 게임 진행에 필요하지 않으므로 유예를 주지 않는다.
+    // 관전자 때문에 게임이 멈추면 안 된다.
+    if (consented || p.isSpectator) {
       this.system(`${p.nickname}님이 나갔습니다`);
       this.confirmDeparture(client.sessionId);
       return;
@@ -242,7 +253,8 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
 
         const player = this.state.players.get(client.sessionId);
         if (!player) return;
-        if (player.isSpectator && type !== "chat") return;
+        // 관전자는 읽기 전용이다. 훈수로 게임에 개입하는 것을 막는다 (D3).
+        if (player.isSpectator) return;
 
         try {
           this.handle(type, client, player, parsed.data);
@@ -352,6 +364,20 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     }
   }
 
+  /** 로비 목록(`/api/rooms`)이 읽는 메타데이터를 상태와 맞춘다. */
+  private syncMetadata(): void {
+    const s = this.state;
+    this.setMetadata({
+      name: s.name,
+      isPublic: s.isPublic,
+      gameMode: s.gameMode,
+      category: s.category,
+      maxPlayers: s.maxPlayers,
+      inProgress: IN_ROUND_PHASES.has(s.phase as Phase),
+      occupancy: this.occupancy(),
+    });
+  }
+
   /** 상태에 파생 필드를 반영하고 뷰를 다시 계산한다. */
   private refresh(): void {
     this.state.phaseRemainingMs = this.timer.remainingMs();
@@ -360,6 +386,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     let latest = 0;
     for (const w of this.waiting.values()) latest = Math.max(latest, w.deadline - Date.now());
     this.state.graceRemainingMs = Math.max(0, latest);
+    this.syncMetadata();
     syncViews(this.clients, this.state);
   }
 
@@ -368,6 +395,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   // ───────────────────────────────────────────────────────────
 
   private startRound(advanceRound = true): void {
+    this.promoteSpectators();     // 다음 라운드부터 참여한다 (F7)
     const ids = this.players().map((p) => p.id);
     const category = resolveCategory(this.state.category);
     const words = pickWords(category);
@@ -587,6 +615,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
 
   /** M1은 1라운드 완결이므로 결과에서 대기실로 돌아간다. 연속 라운드는 M4. */
   private backToLobby(): void {
+    this.promoteSpectators();
     clearSecrets(this.players());
     this.clearRoundResult();
     this.state.round = 0;
@@ -639,15 +668,18 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     if (typeof data.descriptionTime === "number") s.descriptionTime = data.descriptionTime;
     if (typeof data.discussionTime === "number") s.discussionTime = data.discussionTime;
     if (typeof data.defenseTime === "number") s.defenseTime = data.defenseTime;
-    this.setMetadata({ name: s.name, isPublic: s.isPublic });
+    this.syncMetadata();
     this.refresh();
   }
 
   private kick(targetId: string, byId: string): void {
     if (targetId === byId) return;
-    const target = this.clients.find((c) => c.sessionId === targetId);
-    if (!target) return;
-    target.leave(4001);
+    const p = this.state.players.get(targetId);
+    if (!p) return;
+    // 라운드 진행 중에는 관전자만 강퇴할 수 있다.
+    // 플레이어를 빼면 라운드가 깨진다.
+    if (IN_ROUND_PHASES.has(this.state.phase as Phase) && !p.isSpectator) return;
+    this.clients.find((c) => c.sessionId === targetId)?.leave(4000);
   }
 
   private reassignHost(): void {
@@ -683,7 +715,35 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   private players(): PlayerSchema[] {
     return [...this.state.players.values()].filter((p) => !p.isSpectator);
   }
+  private spectators(): PlayerSchema[] {
+    return [...this.state.players.values()].filter((p) => p.isSpectator);
+  }
   private playerCount(): number {
     return this.players().length;
+  }
+  /** 플레이어 + 관전자. 정원 불변식(D11)의 기준이다. */
+  private occupancy(): number {
+    return this.state.players.size;
+  }
+
+  /**
+   * 관전자를 전원 플레이어로 승격시킨다.
+   *
+   * 불변식(플레이어 + 관전자 ≤ 최대 인원) 덕분에 정원 검사가 필요 없다 —
+   * 승격 후에도 반드시 정원 안이다.
+   */
+  private promoteSpectators(): void {
+    const promoted = this.spectators();
+    if (promoted.length === 0) return;
+    for (const p of promoted) {
+      p.isSpectator = false;
+      p.score = 0;               // 도중 합류자는 0점부터 (REQUIREMENTS §1.7)
+      p.hasCheckedWord = false;
+      p.description = "";
+      p.nominatedId = "";
+      p.hasFinalVoted = false;
+    }
+    if (!this.players().some((p) => p.isHost)) this.reassignHost();
+    this.system(`${promoted.map((p) => p.nickname).join(", ")}님이 참가자가 되었습니다`);
   }
 }

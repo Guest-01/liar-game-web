@@ -15,6 +15,7 @@
   import LiarGuess from "../game/LiarGuess.svelte";
   import RoundResult from "../game/RoundResult.svelte";
   import PauseBanner from "../game/PauseBanner.svelte";
+  import SpectatorBanner from "../game/SpectatorBanner.svelte";
 
   let { roomId }: { roomId: string } = $props();
 
@@ -64,6 +65,7 @@
       <button onclick={exit} class="text-sm text-gray-400 hover:text-white shrink-0">나가기</button>
     </header>
 
+    <SpectatorBanner />
     <PauseBanner />
 
     <main class="flex-1 container mx-auto p-4 max-w-6xl lg:grid lg:grid-cols-5 lg:gap-6 min-h-0">

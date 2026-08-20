@@ -166,3 +166,6 @@ export const playerList = () =>
 export const nicknameOf = (id: string) => game.snapshot?.players[id]?.nickname ?? "알 수 없음";
 export const disconnectedPlayers = () =>
   Object.values(game.snapshot?.players ?? {}).filter((p) => !p.isConnected && !p.isSpectator);
+export const spectatorList = () =>
+  Object.values(game.snapshot?.players ?? {}).filter((p) => p.isSpectator);
+export const amSpectator = () => me()?.isSpectator === true;

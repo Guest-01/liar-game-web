@@ -69,8 +69,19 @@ describe("대기실", () => {
     expect(s().players.get(clients[1]!.sessionId).isHost).toBe(true);
   });
 
-  it("게임 중에는 입장이 거부된다 (관전은 M3)", async () => {
-    const { room, clients } = await makeRoom(4);
+  it("게임 중 입장은 관전자로 처리된다 (M3)", async () => {
+    const { room, clients, s } = await makeRoom(4);
+    s().maxPlayers = 6;                       // 관전 자리를 만든다
+    clients[0]!.send("start-match", {});
+    await tick(room);
+    const late = await colyseus.connectTo(room, { nickname: "늦은사람" });
+    await tick(room);
+    expect(s().players.get(late.sessionId).isSpectator).toBe(true);
+  });
+
+  it("정원이 꽉 차면 게임 중 입장이 거부된다", async () => {
+    const { room, clients, s } = await makeRoom(4);
+    s().maxPlayers = 4;
     clients[0]!.send("start-match", {});
     await tick(room);
     await expect(colyseus.connectTo(room, { nickname: "늦은사람" })).rejects.toThrow();

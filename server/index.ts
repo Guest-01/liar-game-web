@@ -28,25 +28,37 @@ app.get("/api/categories", (_req, res) => {
   res.json({ categories: categoryNames() });
 });
 
+/**
+ * 로비 방 목록.
+ *
+ * 게임 중인 방도 노출한다 — 관전 진입 경로가 있어야 하기 때문이다 (D12).
+ * 자리가 없는 방과 빈 방만 감춘다.
+ */
 app.get("/api/rooms", async (_req, res) => {
   const rooms = await matchMaker.query({ name: "liar" });
   const list: LobbyRoom[] = rooms
-    .filter((r) => r.clients > 0)
     .map((r) => {
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      const maxPlayers = Number(meta.maxPlayers ?? r.maxClients);
+      const occupancy = Number(meta.occupancy ?? r.clients);
+      const inProgress = Boolean(meta.inProgress);
+      const hasRoom = occupancy < maxPlayers;
       return {
         roomId: r.roomId,
         name: String(meta.name ?? "방"),
         isPublic: meta.isPublic !== false,
-        playerCount: r.clients,
-        maxPlayers: r.maxClients,
+        playerCount: occupancy,
+        maxPlayers,
         gameMode: (meta.gameMode as LobbyRoom["gameMode"]) ?? "normal",
         category: String(meta.category ?? "랜덤"),
-        inProgress: Boolean(meta.inProgress),
-        canSpectate: false,   // M3
+        inProgress,
+        // 관전 자리 = 최대 인원 − 현재 인원 (D11)
+        canSpectate: inProgress && hasRoom,
       };
     })
-    .filter((r) => !r.inProgress && r.playerCount < r.maxPlayers);
+    .filter((r) => r.playerCount > 0 && (r.canSpectate || (!r.inProgress && r.playerCount < r.maxPlayers)))
+    // 참가 가능한 방을 위로
+    .sort((a, b) => Number(a.inProgress) - Number(b.inProgress));
   res.json({ rooms: list });
 });
 

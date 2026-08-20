@@ -1,7 +1,10 @@
 <script lang="ts">
-  import { game, isHost, playerList, send } from "../lib/connection.svelte.js";
+  import { game, isHost, playerList, send, spectatorList } from "../lib/connection.svelte.js";
 
-  const canKick = $derived(isHost() && game.snapshot?.phase === "waiting");
+  const inRound = $derived(game.snapshot?.phase !== "waiting");
+  // 라운드 중에는 관전자만 강퇴할 수 있다 (서버도 같은 규칙을 강제한다)
+  const canKickPlayer = $derived(isHost() && !inRound);
+  const canKickSpectator = $derived(isHost());
 </script>
 
 <div class="bg-gray-800 rounded-xl p-4">
@@ -22,11 +25,33 @@
         {:else if game.snapshot?.phase === "word-check" && p.hasCheckedWord}
           <span class="text-xs text-success">확인</span>
         {/if}
-        {#if canKick && p.id !== game.mySessionId}
+        {#if canKickPlayer && p.id !== game.mySessionId}
           <button onclick={() => send("kick", { targetId: p.id })}
                   class="text-xs text-danger hover:underline">강퇴</button>
         {/if}
       </li>
     {/each}
   </ul>
+
+  {#if spectatorList().length > 0}
+    <div class="mt-4 pt-3 border-t border-gray-700">
+      <h3 class="font-semibold text-sm text-gray-400 mb-2">
+        👁 관전자 ({spectatorList().length})
+      </h3>
+      <ul class="space-y-1.5">
+        {#each spectatorList() as p (p.id)}
+          <li class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-700/30 text-sm">
+            <span class="flex-1 truncate text-gray-300">
+              {p.nickname}
+              {#if p.id === game.mySessionId}<span class="text-xs text-secondary">(나)</span>{/if}
+            </span>
+            {#if canKickSpectator && p.id !== game.mySessionId}
+              <button onclick={() => send("kick", { targetId: p.id })}
+                      class="text-xs text-danger hover:underline">강퇴</button>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 </div>
