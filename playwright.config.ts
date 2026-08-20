@@ -39,7 +39,9 @@ export default defineConfig({
   webServer: {
     command: "npm run build && npm start",
     port: PORT,
-    env: { NODE_ENV: "production", PORT: String(PORT) },
+    // ⚠️ 이 환경에는 dotenvx가 node 프로세스에 .env를 자동 주입한다. 웹훅을 비워
+    //    두지 않으면 E2E가 띄운 서버가 운영자의 실제 Discord를 바라본다.
+    env: { NODE_ENV: "production", PORT: String(PORT), DISCORD_WEBHOOK_URL: "" },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

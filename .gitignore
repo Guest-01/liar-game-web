@@ -36,3 +36,5 @@ temp/
 # Playwright
 test-results/
 playwright-report/
+# Playwright MCP가 남기는 스냅샷·콘솔 로그 (에이전트가 브라우저를 몰 때 생긴다)
+.playwright-mcp/
