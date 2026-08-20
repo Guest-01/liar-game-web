@@ -284,3 +284,13 @@ v1에 없던 기능이라 과거 버그는 없지만, **구조적으로 위험�
   이 오류가 끝까지 보이지 않았다. `tsc`를 처음 돌린 순간 드러났다.
   `tsx`/`vite`는 트랜스파일만 하고 타입을 검사하지 않는다.
 - **테스트**: CI가 `tsc -p tsconfig.server.json --noEmit`과 `svelte-check`를 모두 실행한다.
+
+### G11. Vite HMR과 Colyseus WebSocket이 같은 포트를 공유하면 안 된다 · **v2 신규**
+- [x] 개발 서버에서 HMR이 **별도 포트**를 쓴다 (`vite.config.ts`의 `server.hmr.port`).
+- **왜**: Colyseus의 방 소켓 경로가 `/{processId}/{roomId}` 라 접두사로 가를 수 없어
+  프록시가 모든 WebSocket 업그레이드를 Colyseus로 넘긴다. HMR이 같은 포트를 쓰면
+  `ws://<vite>/?token=...` 이 Colyseus로 흘러들어가
+  `Invalid WebSocket frame: invalid status code ...` 가 쏟아진다.
+  **증상이 게임 로직과 무관해 보여 원인을 찾기 어렵다.**
+- **테스트**: `npm run dev` 후 브라우저로 게임에 접속했을 때 서버 로그에
+  `Invalid WebSocket frame` 이 한 건도 없다.

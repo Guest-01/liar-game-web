@@ -14,7 +14,8 @@
 import { createServer } from "node:net";
 import { spawn } from "node:child_process";
 
-const DEFAULT_PORT = 2567;   // Colyseus 기본값. 3000은 다른 도구와 너무 자주 겹친다
+const DEFAULT_PORT = 2567;       // Colyseus 기본값. 3000은 다른 도구와 너무 자주 겹친다
+const DEFAULT_HMR_PORT = 24678;  // Vite HMR 전용. 프록시를 타지 않아야 한다 (아래 참조)
 const MAX_TRIES = 20;
 
 function isFree(port) {
@@ -50,8 +51,25 @@ async function resolvePort() {
   process.exit(1);
 }
 
+async function findFree(from, label) {
+  for (let i = 0; i < MAX_TRIES; i++) {
+    if (await isFree(from + i)) return from + i;
+  }
+  console.error(`✖ ${label} 포트를 찾지 못했습니다 (${from}부터 ${MAX_TRIES}개 시도).`);
+  process.exit(1);
+}
+
 const port = await resolvePort();
-console.log(`\n▶ 서버 :${port}  ·  클라이언트는 Vite가 알려주는 주소로 접속하세요\n`);
+
+// Vite HMR을 **별도 포트**로 뺀다.
+//
+// Vite HMR은 `ws://<vite>/?token=...` 로 붙는데, 우리 프록시는 WebSocket 업그레이드를
+// 전부 Colyseus로 넘긴다(Colyseus는 `/{processId}/{roomId}` 를 쓴다). 같은 포트를 쓰면
+// HMR 소켓이 Colyseus로 흘러들어가 "Invalid WebSocket frame" 이 쏟아진다.
+// HMR을 따로 빼면 프록시를 타는 WebSocket은 Colyseus 것뿐이다.
+const hmrPort = await findFree(DEFAULT_HMR_PORT, "HMR");
+
+console.log(`\n▶ 서버 :${port}  ·  HMR :${hmrPort}  ·  Vite가 알려주는 주소로 접속하세요\n`);
 
 // shell:true와 배열 인자를 함께 쓰면 배열이 공백으로 이어 붙어 각 명령이
 // 쪼개진다. 인자를 그대로 전달하기 위해 셸을 쓰지 않는다.
@@ -61,7 +79,7 @@ const child = spawn(
   ["concurrently", "-n", "server,client", "-c", "blue,magenta",
    "tsx watch --env-file-if-exists=.env server/index.ts",
    "vite"],
-  { stdio: "inherit", env: { ...process.env, PORT: String(port) } },
+  { stdio: "inherit", env: { ...process.env, PORT: String(port), VITE_HMR_PORT: String(hmrPort) } },
 );
 
 const stop = () => child.kill("SIGINT");

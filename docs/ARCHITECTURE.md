@@ -196,6 +196,16 @@ test           vitest run
 > 프로덕션에서도 포트가 컨테이너 포트 매핑과 묶여 있으므로 임의로 바뀌면
 > 외부에서 닿지 못한다 — 둘 다 점유 시 **즉시 실패**한다.
 
+> ### ⚠️ Vite HMR은 반드시 별도 포트로 뺀다
+> Colyseus의 방 소켓 경로는 `/{processId}/{roomId}` 라서 접두사로 가를 수 없다.
+> 그래서 프록시가 **모든 WebSocket 업그레이드**를 Colyseus로 넘긴다.
+>
+> Vite HMR은 `ws://<vite>/?token=...` 으로 붙으므로 같은 포트를 쓰면 HMR 소켓이
+> Colyseus로 흘러들어가고, 서버에 `Invalid WebSocket frame: invalid status code ...`
+> 가 끝없이 쏟아진다. 증상이 게임 로직과 무관해 보여서 원인을 찾기 어렵다.
+>
+> `scripts/dev.mjs`가 HMR 포트(기본 24678)도 함께 확정해 `VITE_HMR_PORT`로 넘긴다.
+
 ---
 
 ## 3. 상태 모델
