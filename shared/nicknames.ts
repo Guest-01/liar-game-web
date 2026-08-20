@@ -1,3 +1,5 @@
+import { pick, type Rng, defaultRng } from "./random.js";
+
 // 랜덤 한글 닉네임 생성기. v1(v1.4.1)에서 이식.
 const adjectives: string[] = [
   '행복한', '용감한', '빠른', '느긋한', '귀여운',
@@ -13,8 +15,6 @@ const nouns: string[] = [
   '햄스터', '고슴도치', '수달', '너구리', '미어캣'
 ];
 
-export function generateRandomNickname(): string {
-  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  return adj + noun;
+export function generateRandomNickname(rng: Rng = defaultRng): string {
+  return pick(adjectives, rng) + pick(nouns, rng);
 }

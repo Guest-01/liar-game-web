@@ -1,27 +1,31 @@
-# ⚠️ v1 기준. package.json이 없는 현재 상태로는 통과하지 못한다. M1에서 맞춘다.
-# (트리거가 main 대상 push/PR뿐이라 v2 브랜치 푸시로는 실행되지 않는다.)
-# 그때 `tsc --noEmit`과 `svelte-check`를 반드시 추가할 것 (체크리스트 G10).
-
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, v2]
   pull_request:
     branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
 
       - run: npm ci
-      - run: npm run build
-      - run: npm test
+
+      # tsx/vite는 타입을 검사하지 않는다. 이 단계가 없으면 타입 오류가
+      # 런타임까지 숨는다 (체크리스트 G10).
+      - name: 타입 검사
+        run: npm run typecheck
+
+      # 정보 은닉 바이트 테스트가 여기 포함된다 — 배포 게이트
+      - name: 테스트
+        run: npm test
+
+      - name: 빌드
+        run: npm run build

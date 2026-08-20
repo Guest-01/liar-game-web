@@ -1,0 +1,91 @@
+<script lang="ts">
+  import { game, joinRoom, leave, me } from "../lib/connection.svelte.js";
+  import { getNickname, takePassword, clearPassword } from "../lib/session.js";
+  import { navigate } from "../router.js";
+  import { toast } from "../ui/toast.svelte.js";
+
+  import PlayerList from "../game/PlayerList.svelte";
+  import Chat from "../game/Chat.svelte";
+  import Waiting from "../game/Waiting.svelte";
+  import WordCheck from "../game/WordCheck.svelte";
+  import Description from "../game/Description.svelte";
+  import Discussion from "../game/Discussion.svelte";
+  import Defense from "../game/Defense.svelte";
+  import FinalVote from "../game/FinalVote.svelte";
+  import LiarGuess from "../game/LiarGuess.svelte";
+  import RoundResult from "../game/RoundResult.svelte";
+
+  let { roomId }: { roomId: string } = $props();
+
+  $effect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await joinRoom(roomId, getNickname(), takePassword(roomId));
+        clearPassword(roomId);
+      } catch {
+        if (cancelled) return;
+        toast(game.error || "방에 들어갈 수 없습니다", "error");
+        navigate("/", true);
+      }
+    })();
+    return () => { cancelled = true; void leave(); };
+  });
+
+  const s = $derived(game.snapshot);
+  const phase = $derived(s?.phase ?? "waiting");
+  // 연출 페이즈(M1에서는 즉시 통과)는 직전 화면을 그대로 유지한다
+  const view = $derived(
+    phase === "description-reveal" ? "description"
+    : phase === "vote-reveal" ? "final-vote"
+    : phase,
+  );
+
+  async function exit() { await leave(); navigate("/"); }
+</script>
+
+{#if !s}
+  <div class="fixed inset-0 flex items-center justify-center">
+    <p class="text-gray-400">{game.error || "연결 중…"}</p>
+  </div>
+{:else}
+  <div class="min-h-screen flex flex-col">
+    <header class="border-b border-gray-800 px-4 py-3 flex items-center gap-3">
+      <h1 class="text-lg font-bold truncate flex-1">{s.name}</h1>
+      {#if s.round > 0}
+        <span class="text-sm text-gray-400 shrink-0">라운드 {s.round}</span>
+      {/if}
+      {#if me() && !me()!.amILiar && me()!.myWord}
+        <span class="text-sm shrink-0">제시어: <span class="text-primary font-semibold">{me()!.myWord}</span></span>
+      {:else if me()?.amILiar}
+        <span class="text-sm text-danger font-semibold shrink-0">당신은 라이어</span>
+      {/if}
+      <button onclick={exit} class="text-sm text-gray-400 hover:text-white shrink-0">나가기</button>
+    </header>
+
+    {#if s.isPaused}
+      <div class="bg-warning/20 border-b border-warning px-4 py-2 text-center text-sm">
+        {s.pausedFor}님의 재접속을 기다리는 중…
+      </div>
+    {/if}
+
+    <main class="flex-1 container mx-auto p-4 max-w-6xl lg:grid lg:grid-cols-5 lg:gap-6 min-h-0">
+      <div class="lg:col-span-3 flex flex-col gap-6">
+        {#if view === "waiting"}<Waiting />
+        {:else if view === "word-check"}<WordCheck />
+        {:else if view === "description"}<Description />
+        {:else if view === "discussion"}<Discussion />
+        {:else if view === "defense"}<Defense />
+        {:else if view === "final-vote"}<FinalVote />
+        {:else if view === "liar-guess"}<LiarGuess />
+        {:else if view === "round-result"}<RoundResult />
+        {/if}
+      </div>
+
+      <aside class="lg:col-span-2 flex flex-col gap-4 mt-6 lg:mt-0 min-h-0">
+        <PlayerList />
+        <div class="flex-1 min-h-64"><Chat /></div>
+      </aside>
+    </main>
+  </div>
+{/if}
