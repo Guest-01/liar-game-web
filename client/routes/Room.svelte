@@ -1,7 +1,7 @@
 <script lang="ts">
   import { game, joinRoom, leave, me } from "../lib/connection.svelte.js";
   import { getNickname, takePassword, clearPassword } from "../lib/session.js";
-  import { navigate } from "../router.js";
+  import { navigate } from "../router.svelte.js";
   import { toast } from "../ui/toast.svelte.js";
 
   import PlayerList from "../game/PlayerList.svelte";

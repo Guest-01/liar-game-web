@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../router.js";
+  import { navigate } from "../router.svelte.js";
   import { getNickname, isValidNickname, setNickname } from "../lib/session.js";
   import { createRoom, game } from "../lib/connection.svelte.js";
   import { ROOM_NAME_MAX } from "../../shared/constants.js";

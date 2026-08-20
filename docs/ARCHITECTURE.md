@@ -457,6 +457,12 @@ export const game = $state<{ snapshot: RoomSnapshot | null }>({ snapshot: null }
 room.onStateChange((s) => { game.snapshot = s.toJSON() as RoomSnapshot });
 ```
 
+> ### ⚠️ 룬을 쓰는 파일은 확장자가 `.svelte.ts` 여야 한다
+> 평범한 `.ts` 에 `$state` 를 쓰면 `tsc`·`svelte-check`·`vite build` 가 **전부
+> 통과하는데** 브라우저가 모듈을 로드하는 순간 `rune_outside_svelte` 로 죽는다.
+> 정적 검사가 하나도 잡지 못하므로 `client/conventions.test.ts` 가 파일명 규약을
+> 강제한다. 파일명을 바꾸면 import 경로도 `*.svelte.js` 로 바꿔야 한다.
+
 세밀한 Schema 콜백을 쓰지 않는다. 매 패치마다 전체 스냅샷을 갈아끼우는 것이
 이 규모에서 더 단순하고 충분히 빠르다.
 

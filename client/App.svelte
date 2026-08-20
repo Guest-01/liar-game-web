@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { route } from "./router.js";
+  import { route } from "./router.svelte.js";
   import Lobby from "./routes/Lobby.svelte";
   import Create from "./routes/Create.svelte";
   import RoomView from "./routes/Room.svelte";

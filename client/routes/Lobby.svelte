@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../router.js";
+  import { navigate } from "../router.svelte.js";
   import { getNickname, isValidNickname, setNickname, stashPassword } from "../lib/session.js";
   import { generateRandomNickname } from "../../shared/nicknames.js";
   import type { LobbyRoom } from "../../shared/snapshot.js";

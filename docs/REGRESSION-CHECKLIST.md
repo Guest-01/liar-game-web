@@ -294,3 +294,11 @@ v1에 없던 기능이라 과거 버그는 없지만, **구조적으로 위험�
   **증상이 게임 로직과 무관해 보여 원인을 찾기 어렵다.**
 - **테스트**: `npm run dev` 후 브라우저로 게임에 접속했을 때 서버 로그에
   `Invalid WebSocket frame` 이 한 건도 없다.
+
+### G12. Svelte 룬은 `.svelte` / `.svelte.ts` 에서만 쓴다 · **v2 신규**
+- [x] 룬(`$state`·`$derived`·`$effect`·`$props`)을 쓰는 파일은 `.svelte` 또는 `.svelte.ts` 다.
+- **왜**: 평범한 `.ts` 에 쓰면 **`tsc`·`svelte-check`·`vite build`가 모두 통과하는데**
+  브라우저가 모듈을 로드하는 순간 `Uncaught Svelte error: rune_outside_svelte` 로 죽는다.
+  정적 검사가 하나도 잡아주지 않는다.
+- **테스트**: `client/conventions.test.ts` 가 파일명 규약을 강제한다.
+- **함께 볼 것**: 파일명을 바꾸면 import 경로도 `*.svelte.js` 로 바꿔야 한다.
