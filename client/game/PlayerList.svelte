@@ -17,7 +17,9 @@
           {#if p.isHost}<span title="호스트">👑</span>{/if}
           {#if p.id === game.mySessionId}<span class="text-xs text-primary">(나)</span>{/if}
         </span>
-        {#if game.snapshot?.phase === "word-check" && p.hasCheckedWord}
+        {#if !p.isConnected}
+          <span class="text-xs text-warning">접속 끊김</span>
+        {:else if game.snapshot?.phase === "word-check" && p.hasCheckedWord}
           <span class="text-xs text-success">확인</span>
         {/if}
         {#if canKick && p.id !== game.mySessionId}

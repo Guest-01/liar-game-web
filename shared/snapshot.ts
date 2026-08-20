@@ -53,7 +53,7 @@ export type RoomSnapshot = {
   phaseRemainingMs: number; // 상대 시간. 절대 시각을 보내지 않는다 (체크리스트 D6)
   phaseEndsAt: number;      // 0 = 무기한
   isPaused: boolean;
-  pausedFor: string;
+  graceRemainingMs: number;
   round: number;
   descriptionAttempts: number;
   discussionAttempts: number;

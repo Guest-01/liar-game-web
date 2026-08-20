@@ -14,6 +14,7 @@
   import FinalVote from "../game/FinalVote.svelte";
   import LiarGuess from "../game/LiarGuess.svelte";
   import RoundResult from "../game/RoundResult.svelte";
+  import PauseBanner from "../game/PauseBanner.svelte";
 
   let { roomId }: { roomId: string } = $props();
 
@@ -63,11 +64,7 @@
       <button onclick={exit} class="text-sm text-gray-400 hover:text-white shrink-0">나가기</button>
     </header>
 
-    {#if s.isPaused}
-      <div class="bg-warning/20 border-b border-warning px-4 py-2 text-center text-sm">
-        {s.pausedFor}님의 재접속을 기다리는 중…
-      </div>
-    {/if}
+    <PauseBanner />
 
     <main class="flex-1 container mx-auto p-4 max-w-6xl lg:grid lg:grid-cols-5 lg:gap-6 min-h-0">
       <div class="lg:col-span-3 flex flex-col gap-6">

@@ -67,6 +67,8 @@ export const MESSAGE_SCHEMAS = {
   "final-vote": FinalVote,
   "liar-guess": LiarGuess,
   "next-round": z.object({}).loose(),
+  /** 호스트가 재접속 대기를 건너뛴다. 페이즈와 무관하게 허용된다. */
+  "skip-wait": z.object({}).loose(),
 } as const;
 
 export type MessageType = keyof typeof MESSAGE_SCHEMAS;

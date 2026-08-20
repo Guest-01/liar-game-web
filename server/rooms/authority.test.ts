@@ -9,11 +9,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Server } from "colyseus";
 import { LiarRoom } from "./LiarRoom.js";
 
+/** 유예를 1초로 줄인 테스트용 방 */
+class FastGraceRoom extends LiarRoom {
+  protected override graceSeconds = 1;
+}
+
 let colyseus: ColyseusTestServer;
 
 beforeAll(async () => {
   colyseus = await boot({
-    initializeGameServer: (gs: Server) => { gs.define("liar", LiarRoom); },
+    initializeGameServer: (gs: Server) => { gs.define("liar", FastGraceRoom); },
   } as any);
 });
 afterAll(async () => { await colyseus.shutdown(); });
@@ -63,18 +68,38 @@ describe("서버 권위 (F7)", () => {
     expect(room.state.descriptionAttempts).toBe(2);
   });
 
-  it("★ 모든 클라이언트가 사라져도 서버는 페이즈를 계속 진행한다", async () => {
+  it("★ 아무도 아무 메시지를 보내지 않아도 서버가 라운드를 끝까지 끌고 간다", async () => {
+    // F7의 본질은 "끊김을 무시한다"가 아니라 "전이 결정권이 서버에 있다"이다.
+    // 전원 연결은 유지하되 어떤 클라이언트도 입력을 보내지 않는 상황을 만든다.
+    const { room } = await startedRoom();
+    room.state.descriptionTime = 1;
+    room.state.discussionTime = 1;
+    room.enterPhase("description");
+
+    // 서버 혼자 다음을 전부 수행한다:
+    //   설명 4명분 자동 제출 → 토론 → 무투표 → 설명 재시작(2회차)
+    //   → 토론 2회차 → 무투표 → 기회 소진 → 라운드 종료
+    await wait(14_000);
+    expect(room.state.phase).toBe("round-result");
+    expect(room.state.roundEndReason).toBe("chances-exhausted");
+    expect(room.state.roundWinner).toBe("liar");
+  }, 30_000);
+
+  it("전원이 끊기면 일시정지하고, 유예가 지나면 서버가 스스로 정리한다 (M2)", async () => {
+    // M2 도입으로 "전원 끊김"은 즉시 진행이 아니라 일시정지가 맞다.
     const { room, clients } = await startedRoom();
     room.state.descriptionTime = 1;
     room.enterPhase("description");
 
-    // 전원 강제 종료 — v1이라면 여기서 게임이 영원히 멈췄다
-    for (const c of clients) await c.leave(false);
-    await wait(1500);
+    for (const c of clients) await c.leave(false);   // 비정상 끊김
+    await wait(300);
+    expect(room.state.isPaused, "재접속을 기다리며 정지한다").toBe(true);
+    expect(room.state.phase, "정지 중에는 전이하지 않는다").toBe("description");
 
-    // 방은 아직 살아 있고, 타이머는 서버가 소유하므로 전이가 일어났다
-    expect(room.state.phase).not.toBe("description");
-  });
+    // 유예 만료 — 클라이언트 개입 없이 서버가 스스로 정리한다
+    await wait(1800);
+    expect(room.state.players.size).toBe(0);
+  }, 15_000);
 
   it("호스트가 나가도 진행이 멈추지 않는다", async () => {
     const { room, clients } = await startedRoom();

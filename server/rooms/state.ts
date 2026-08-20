@@ -50,7 +50,9 @@ export class RoomSchema extends Schema {
   @type("uint32")  phaseRemainingMs = 0;
   @type("number")  phaseEndsAt = 0;
   @type("boolean") isPaused = false;
-  @type("string")  pausedFor = "";
+  // 유예가 끝나기까지 남은 시간. 누가 끊겼는지는 Player.isConnected로 파생한다
+  // (중복 상태를 두지 않는다).
+  @type("uint32")  graceRemainingMs = 0;
   @type("uint8")   round = 0;
   @type("uint8")   descriptionAttempts = 0;
   @type("uint8")   discussionAttempts = 0;

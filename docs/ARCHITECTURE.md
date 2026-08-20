@@ -241,8 +241,7 @@ class RoomSchema extends Schema {
   @type("string")  phase;                   // §4
   @type("uint32")  phaseRemainingMs;        // ← 절대시각 금지 (체크리스트 D6)
   @type("boolean") isPaused;
-  @type("string")  pausedFor;               // 대기 중인 플레이어 닉네임
-  @type("uint32")  graceRemainingMs;
+  @type("uint32")  graceRemainingMs;        // 누가 끊겼는지는 Player.isConnected로 파생
   @type("uint8")   round;
   @type("uint8")   descriptionAttempts, discussionAttempts;   // 기회 상한 (최대 2)
   @type(["string"]) descriptionOrder;

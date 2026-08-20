@@ -1,7 +1,7 @@
 import { Client, type Room } from "@colyseus/sdk";
 import type { RoomSnapshot } from "../../shared/snapshot.js";
 import type { MessageType } from "../../shared/protocol.js";
-import { saveReconnectToken } from "./session.js";
+import { clearReconnectToken, loadReconnectToken, saveReconnectToken } from "./session.js";
 
 /**
  * Colyseus 상태를 Svelte 반응성에 연결한다.
@@ -24,11 +24,15 @@ export const game = $state<{
   connecting: boolean;
   /** 페이즈 남은 시간(ms). 서버가 준 상대 시간을 수신 시각 기준으로 센다. */
   remainingMs: number;
+  /** 재접속 유예 남은 시간(ms). 같은 방식으로 센다. */
+  graceMs: number;
 }>({
-  room: null, snapshot: null, mySessionId: "", error: "", connecting: false, remainingMs: 0,
+  room: null, snapshot: null, mySessionId: "", error: "", connecting: false,
+  remainingMs: 0, graceMs: 0,
 });
 
 let ticker: ReturnType<typeof setInterval> | null = null;
+let graceTicker: ReturnType<typeof setInterval> | null = null;
 
 function attach(room: Room): void {
   game.room = room;
@@ -40,10 +44,17 @@ function attach(room: Room): void {
   room.onStateChange((state: unknown) => {
     game.snapshot = (state as { toJSON(): RoomSnapshot }).toJSON();
     startCountdown();
+    startGraceCountdown();
   });
 
   room.onError((_code: number, message?: string) => { game.error = message ?? "오류가 발생했습니다"; });
-  room.onLeave(() => { stopCountdown(); game.room = null; });
+  room.onLeave((code: number) => {
+    stopCountdown();
+    stopGraceCountdown();
+    game.room = null;
+    // 정상 퇴장(4000)이면 토큰을 버린다. 비정상이면 새로고침 복귀를 위해 남긴다.
+    if (code === 4000) clearReconnectToken(room.roomId);
+  });
 }
 
 /**
@@ -71,6 +82,25 @@ function stopCountdown(): void {
   if (ticker) { clearInterval(ticker); ticker = null; }
 }
 
+/** 재접속 유예 카운트다운. 페이즈 타이머와 같은 방식(상대 시간 + 수신 시각). */
+function startGraceCountdown(): void {
+  const snap = game.snapshot;
+  stopGraceCountdown();
+  if (!snap?.isPaused || snap.graceRemainingMs <= 0) { game.graceMs = 0; return; }
+
+  const receivedAt = Date.now();
+  const base = snap.graceRemainingMs;
+  game.graceMs = base;
+  graceTicker = setInterval(() => {
+    game.graceMs = Math.max(0, base - (Date.now() - receivedAt));
+    if (game.graceMs === 0) stopGraceCountdown();
+  }, 200);
+}
+
+function stopGraceCountdown(): void {
+  if (graceTicker) { clearInterval(graceTicker); graceTicker = null; }
+}
+
 export async function createRoom(opts: {
   nickname: string; roomName: string; isPublic: boolean; password?: string;
 }): Promise<string> {
@@ -86,8 +116,25 @@ export async function createRoom(opts: {
   }
 }
 
+/**
+ * 방에 들어간다. **저장된 재접속 토큰이 있으면 먼저 복귀를 시도한다.**
+ *
+ * 새로고침·탭 복귀가 여기로 들어온다. 토큰이 만료됐거나 유예가 지났으면
+ * 일반 참가로 넘어간다 (게임 중이면 서버가 거부한다).
+ */
 export async function joinRoom(roomId: string, nickname: string, password?: string): Promise<void> {
   game.connecting = true;
+
+  const token = loadReconnectToken(roomId);
+  if (token) {
+    try {
+      attach(await client.reconnect(token));
+      return;
+    } catch {
+      clearReconnectToken(roomId);   // 만료됨 — 일반 참가로 진행한다
+    }
+  }
+
   try {
     attach(await client.joinById(roomId, { nickname, password }));
   } catch (e) {
@@ -103,6 +150,9 @@ export function send<T extends MessageType>(type: T, payload: unknown = {}): voi
 
 export async function leave(): Promise<void> {
   stopCountdown();
+  stopGraceCountdown();
+  const id = game.room?.roomId;
+  if (id) clearReconnectToken(id);
   await game.room?.leave();
   game.room = null;
   game.snapshot = null;
@@ -114,3 +164,5 @@ export const isHost = () => me()?.isHost ?? false;
 export const playerList = () =>
   Object.values(game.snapshot?.players ?? {}).filter((p) => !p.isSpectator);
 export const nicknameOf = (id: string) => game.snapshot?.players[id]?.nickname ?? "알 수 없음";
+export const disconnectedPlayers = () =>
+  Object.values(game.snapshot?.players ?? {}).filter((p) => !p.isConnected && !p.isSpectator);

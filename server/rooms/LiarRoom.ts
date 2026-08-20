@@ -5,11 +5,12 @@ import { z } from "zod";
 
 import {
   ALL_NOMINATED_GRACE_MS, CHAT_HISTORY, DEFAULT_DEFENSE_TIME, DEFAULT_DESCRIPTION_TIME,
-  DEFAULT_DISCUSSION_TIME, DEFAULT_ROUND_COUNT, MAX_PLAYERS, MIN_PLAYERS, REDO_TARGET,
+  DEFAULT_DISCUSSION_TIME, DEFAULT_ROUND_COUNT, MAX_PLAYERS, MIN_PLAYERS,
+  RECONNECT_GRACE_SEC, REDO_TARGET,
 } from "../../shared/constants.js";
 import { MESSAGE_SCHEMAS, type MessageType, CreateOptions, JoinOptions } from "../../shared/protocol.js";
 import {
-  canStartMatch, decideAfterDiscussion, decideAfterFinalVote, decideAfterLiarGuess,
+  canRediscuss, canStartMatch, decideAfterDiscussion, decideAfterFinalVote, decideAfterLiarGuess,
   isGuessCorrect, isValidCategory, makeDescriptionOrder, pickLiar, pickWords,
   resolveCategory, tallyFinalVote, tallyNominations, wordFor,
 } from "../../shared/rules.js";
@@ -33,6 +34,12 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   private readonly timer = new PhaseTimer();
   private nominations = new Map<string, string>();
   private finalVotes = new Map<string, boolean>();
+
+  /** 재접속 유예 중인 세션. value는 유예 만료 시각(서버 기준)과 취소 핸들. */
+  private waiting = new Map<string, { deadline: number; reject: () => void }>();
+
+  /** 재접속 유예(초). 테스트에서 줄일 수 있도록 인스턴스 속성으로 둔다. */
+  protected graceSeconds: number = RECONNECT_GRACE_SEC;
 
   // ───────────────────────────────────────────────────────────
   // 생명주기
@@ -91,46 +98,132 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     logger.info({ roomId: this.roomId, nickname }, "입장");
   }
 
-  override onLeave(client: Client, code: number): void {
+  override async onLeave(client: Client, code: number): Promise<void> {
     // ⚠️ 0.17에서 두 번째 인자는 boolean(consented)이 아니라 close code다.
     //    4000이 정상 퇴장. `if (consented)`로 쓰면 컴파일은 되고 재접속이 영영 안 된다.
-    //    M1은 재접속이 없으므로 즉시 이탈 처리한다. M2에서 allowReconnection을 넣는다.
-    void code;
+    //    (체크리스트 G1)
+    const consented = code === 4000;
     const p = this.state.players.get(client.sessionId);
     if (!p) return;
 
-    const wasHost = p.isHost;
-    const wasLiar = this.secret?.liarId === client.sessionId;
-    this.state.players.delete(client.sessionId);
-    this.nominations.delete(client.sessionId);
-    this.finalVotes.delete(client.sessionId);
-    this.system(`${p.nickname}님이 나갔습니다`);
+    if (consented) {
+      this.system(`${p.nickname}님이 나갔습니다`);
+      this.confirmDeparture(client.sessionId);
+      return;
+    }
+
+    // ── 유예 시작 ────────────────────────────────────
+    p.isConnected = false;
+    const deferred = this.allowReconnection(client, this.graceSeconds);
+    this.waiting.set(client.sessionId, {
+      deadline: Date.now() + this.graceSeconds * 1000,
+      reject: () => deferred.reject(),
+    });
+    this.timer.onDisconnect();
+    this.system(`${p.nickname}님의 접속이 끊겼습니다 — 재접속을 기다립니다`);
+    this.refresh();
+    logger.info({ roomId: this.roomId, nickname: p.nickname }, "유예 시작");
+
+    try {
+      await deferred;
+      // ── 복귀 ───────────────────────────────────────
+      this.waiting.delete(client.sessionId);
+      const back = this.state.players.get(client.sessionId);
+      if (back) back.isConnected = true;
+      this.timer.onReconnect();
+      this.system(`${p.nickname}님이 돌아왔습니다`);
+      this.refresh();
+      logger.info({ roomId: this.roomId, nickname: p.nickname }, "재접속 성공");
+    } catch {
+      // ── 유예 만료 또는 호스트가 건너뜀 ──────────────
+      this.waiting.delete(client.sessionId);
+      this.timer.onGiveUp();
+      this.system(`${p.nickname}님이 나갔습니다`);
+      this.confirmDeparture(client.sessionId);
+      logger.info({ roomId: this.roomId, nickname: p.nickname }, "이탈 확정");
+    }
+  }
+
+  /** 호스트가 재접속 대기를 건너뛴다. 유예 중인 전원을 즉시 이탈 처리한다. */
+  private skipWait(): void {
+    if (this.waiting.size === 0) return;
+    for (const { reject } of [...this.waiting.values()]) reject();
+  }
+
+  /**
+   * 이탈이 **확정된** 뒤의 처리. 유예 만료 시점 기준으로 판정한다.
+   * 라이어 이탈은 단계별로 다르게 처리한다 (REQUIREMENTS §F8 R3 / D2).
+   */
+  private confirmDeparture(sessionId: string): void {
+    const p = this.state.players.get(sessionId);
+    const wasHost = p?.isHost ?? false;
+    const wasLiar = this.secret?.liarId === sessionId;
+    const wasDefendant = this.state.defendantId === sessionId;
+
+    this.state.players.delete(sessionId);
+    this.nominations.delete(sessionId);
+    this.finalVotes.delete(sessionId);
 
     if (wasHost) this.reassignHost();
     if (this.state.players.size === 0) return;
 
     if (IN_ROUND_PHASES.has(this.state.phase as Phase)) {
+      // ① 이미 결과가 확정된 경우가 최우선이다.
+      //    라이어가 피고로 확정된 뒤 나갔다면 시민이 이긴 것이고, 그 뒤에
+      //    인원이 줄었다고 해서 승리를 무효로 돌리면 "불리해지면 나가서
+      //    무효화" 악용이 그대로 살아난다 (D2).
+      if (wasLiar && this.state.defendantId !== "") {
+        this.system("지목된 라이어가 나갔습니다");
+        this.endRound("citizen", "liar-executed-wrong-guess");
+        return;
+      }
+      // ② 인원 미달 — 아래 어떤 복구도 불가능하다
       if (this.playerCount() < MIN_PLAYERS) {
         this.voidRound("인원이 부족해 라운드를 중단합니다");
         return;
       }
-      if (wasLiar) {
-        // M1 단순형. 단계별 차등(R3)은 M2에서 유예와 함께 넣는다.
-        this.voidRound("라이어가 나가 라운드를 무효 처리합니다");
-        return;
-      }
-      if (this.state.defendantId === client.sessionId) {
-        this.system("피고가 나가 토론을 재개합니다");
-        this.startDiscussion();
-        return;
-      }
+      // ③ 라이어 이탈 (아직 결과 미확정)
+      if (wasLiar) { this.handleLiarDeparture(); return; }
+      // ④ 피고 이탈
+      if (wasDefendant) { this.handleDefendantDeparture(); return; }
       this.reconcileAfterLeave();
     }
     this.refresh();
   }
 
+  /**
+   * 라이어가 **결과 확정 전에** 이탈했을 때 (D2).
+   * 피고 확정 후는 confirmDeparture가 먼저 처리한다.
+   */
+  private handleLiarDeparture(): void {
+    if (this.state.phase === "word-check") {
+      // 아직 정보가 게임에 반영되지 않았다 → 깨끗하게 되감는다.
+      // 라운드 수를 소모하지 않는다.
+      this.system("라이어가 나가 라운드를 다시 시작합니다");
+      this.startRound(false);
+      return;
+    }
+    // 설명~지목 중: 아직 시민이 이긴 것이 아니므로 공짜 점수를 주지 않는다
+    this.voidRound("라이어가 나가 라운드를 무효 처리합니다");
+  }
+
+  /** 피고(라이어가 아닌)가 이탈했을 때: 기회가 남으면 재토론. */
+  private handleDefendantDeparture(): void {
+    const attempts = {
+      description: this.state.descriptionAttempts,
+      discussion: this.state.discussionAttempts,
+    };
+    if (canRediscuss(attempts)) {
+      this.system("피고가 나가 토론을 재개합니다");
+      this.startDiscussion();
+    } else {
+      this.endRound("liar", "chances-exhausted");
+    }
+  }
+
   override onDispose(): void {
     this.timer.reset();
+    this.waiting.clear();
   }
 
   // ───────────────────────────────────────────────────────────
@@ -140,7 +233,8 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   private registerMessages(): void {
     for (const type of Object.keys(MESSAGE_SCHEMAS) as MessageType[]) {
       this.onMessage(type, (client, payload) => {
-        if (!phaseAccepts(this.state.phase, type)) return;
+        // skip-wait는 유예 중 어느 페이즈에서든 허용된다
+        if (type !== "skip-wait" && !phaseAccepts(this.state.phase, type)) return;
 
         const schema = MESSAGE_SCHEMAS[type] as z.ZodType;
         const parsed = schema.safeParse(payload ?? {});
@@ -195,6 +289,9 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
         break;
       case "next-round":
         if (hostOnly()) this.backToLobby();
+        break;
+      case "skip-wait":
+        if (hostOnly()) this.skipWait();
         break;
     }
   }
@@ -259,6 +356,10 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   private refresh(): void {
     this.state.phaseRemainingMs = this.timer.remainingMs();
     this.state.isPaused = this.timer.paused;
+    // 유예가 모두 끝나기까지 남은 시간. 클라이언트는 수신 시각 기준으로 센다.
+    let latest = 0;
+    for (const w of this.waiting.values()) latest = Math.max(latest, w.deadline - Date.now());
+    this.state.graceRemainingMs = Math.max(0, latest);
     syncViews(this.clients, this.state);
   }
 
@@ -266,14 +367,14 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   // 라운드 흐름
   // ───────────────────────────────────────────────────────────
 
-  private startRound(): void {
+  private startRound(advanceRound = true): void {
     const ids = this.players().map((p) => p.id);
     const category = resolveCategory(this.state.category);
     const words = pickWords(category);
     const liarId = pickLiar(ids);
 
     this.state.category = category;
-    this.state.round += 1;
+    if (advanceRound) this.state.round += 1;
     this.state.descriptionAttempts = 0;
     this.state.discussionAttempts = 0;
     this.state.descriptionOrder = new ArraySchema<string>(...makeDescriptionOrder(ids));
