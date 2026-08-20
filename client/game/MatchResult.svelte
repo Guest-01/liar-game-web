@@ -1,6 +1,7 @@
 <script lang="ts">
   import { game, isHost, playerList, send } from "../lib/connection.svelte.js";
   import { rank } from "../../shared/rules.js";
+  import Feedback from "../ui/Feedback.svelte";
 
   const s = $derived(game.snapshot!);
   const ranked = $derived(rank(playerList()));
@@ -39,4 +40,6 @@
   {:else}
     <p class="text-gray-400">호스트가 대기실로 돌아가기를 기다리는 중…</p>
   {/if}
+
+  <div class="pt-4"><Feedback roomId={game.room?.roomId ?? ""} /></div>
 </div>

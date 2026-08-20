@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,9 +23,37 @@ jobs:
       - name: 타입 검사
         run: npm run typecheck
 
-      # 정보 은닉 바이트 테스트가 여기 포함된다 — 배포 게이트
-      - name: 테스트
+      # 서버: 정보 은닉 바이트 테스트가 여기 포함된다 — 배포 게이트
+      # 클라이언트: happy-dom 스모크 (rune_outside_svelte 부류를 잡는다, G12)
+      - name: 단위·통합 테스트
         run: npm test
 
       - name: 빌드
         run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # ubuntu-latest에는 헤드리스 크롬 의존성이 --with-deps로 설치된다.
+      # (로컬 WSL에서는 libnss3, libnspr4가 따로 필요하다)
+      - name: 브라우저 설치
+        run: npm run test:e2e:install
+
+      - name: 실브라우저 스모크
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-trace
+          path: test-results/
+          retention-days: 7

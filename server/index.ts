@@ -6,6 +6,7 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 
 import { LiarRoom } from "./rooms/LiarRoom.js";
+import { initFeedback, isFeedbackEnabled, submitFeedback, sweepCooldowns } from "./feedback.js";
 import { createShellRenderer } from "./shell.js";
 import { logger } from "./logger.js";
 import { categoryNames } from "../shared/rules.js";
@@ -24,8 +25,19 @@ app.set("trust proxy", 1);
 app.use(express.json({ limit: "16kb" }));
 
 // ── API ──────────────────────────────────────────────
+app.get("/api/config", (_req, res) => {
+  res.json({ feedbackEnabled: isFeedbackEnabled() });
+});
+
 app.get("/api/categories", (_req, res) => {
   res.json({ categories: categoryNames() });
+});
+
+app.post("/api/feedback", async (req, res) => {
+  const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
+  const result = await submitFeedback(req.body, ip);
+  if (result.ok) res.json({ success: true });
+  else res.status(result.status).json({ error: result.error });
 });
 
 /**
@@ -81,7 +93,10 @@ gameServer.define("liar", LiarRoom);
 // ⚠️ setTransport()가 Server.listen() 안에서 실행된다. httpServer를 직접
 //    listen하면 매치메이킹이 죽는다. (체크리스트 G3)
 try {
-  await gameServer.listen(PORT);
+  await initFeedback();
+setInterval(sweepCooldowns, 10 * 60 * 1000).unref();
+
+await gameServer.listen(PORT);
 } catch (err) {
   if ((err as NodeJS.ErrnoException).code === "EADDRINUSE") {
     // 여기서 다음 포트로 넘어가지 않는다. 개발에서는 scripts/dev.mjs가 미리

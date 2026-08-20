@@ -39,6 +39,9 @@ export function createShellRenderer(indexPath: string, baseUrl: string) {
       `<meta property="og:url" content="${esc(url)}">`,
       `<meta property="og:locale" content="ko_KR">`,
       `<meta property="og:site_name" content="라이어 게임">`,
+      // 카카오톡·슬랙 등의 링크 미리보기 썸네일
+      `<meta property="og:image" content="${esc(baseUrl)}/favicon.png">`,
+      `<meta name="twitter:card" content="summary">`,
     ].join("\n  ");
     return template.replace("<!--APP_HEAD-->", head);
   };

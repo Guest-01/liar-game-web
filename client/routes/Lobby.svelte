@@ -4,6 +4,7 @@
   import { generateRandomNickname } from "../../shared/nicknames.js";
   import type { LobbyRoom } from "../../shared/snapshot.js";
   import { toast } from "../ui/toast.svelte.js";
+  import Feedback from "../ui/Feedback.svelte";
 
   let nickname = $state(getNickname());
   let rooms = $state<LobbyRoom[]>([]);
@@ -128,8 +129,11 @@
     </section>
   </div>
 
-  <footer class="mt-6 pt-3 border-t border-gray-800 text-xs text-gray-500 text-center">
-    © 2026 Guest-01 · v2
+  <footer class="mt-6 pt-3 border-t border-gray-800 text-xs text-gray-500 flex items-center justify-center gap-3">
+    <span>© 2026 Guest-01 · v2</span>
+    <Feedback />
+    <a href="https://github.com/Guest-01/liar-game-web" target="_blank" rel="noopener"
+       class="hover:text-gray-300 transition-colors">GitHub</a>
   </footer>
 </main>
 

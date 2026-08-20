@@ -6,11 +6,32 @@
 >
 > 원본: `git show v1.4.1:src/game/Room.test.ts` 등 · 총 130개 케이스
 >
-> ## 사용법
-> v2 구현 중 각 케이스를 아래 셋 중 하나로 분류한다.
-> - **이식**: 규칙이 그대로다 → v2 테스트로 다시 쓴다
-> - **변경**: v2에서 규칙이 바뀌었다 → 새 규칙으로 다시 쓴다 (예: 최소 3인 → 4인)
-> - **폐기**: v2 구조에 해당 개념이 없다 (예: hostToken, socket.id 기반 식별)
+> ## 분류 결과 (M6에서 마무리)
+>
+> v2는 165개의 자체 테스트를 갖췄다. v1 케이스를 1:1로 옮기지 않고
+> **영역 단위로 대응**시켰다 — v2의 구조가 달라 함수 단위 매핑이 성립하지 않는다.
+>
+> | v1 영역 | 분류 | v2에서의 대응 |
+> |---|---|---|
+> | `constructor` / `updateSettings` / `getInfoForClient` | **변경** | `LiarRoom.test.ts` 대기실 · `match.test.ts` 설정 검증 |
+> | `addPlayer` / `removePlayer` | **변경** | `LiarRoom.test.ts` (호스트 이양·닉네임 중복) + `reconnect.test.ts` (유예) |
+> | `startGame` | **변경** | 최소 인원 3 → **4** (D7). `LiarRoom.test.ts` |
+> | `getWordForPlayer` | **이식** | `rules.test.ts` 제시어 배분 + `projection.security.test.ts` (바이트 수준) |
+> | `checkWord` / `submitDescription` | **이식** | `LiarRoom.test.ts` 라운드 흐름 |
+> | `nominate` / `calculateNominationResult` / `allNominated` | **이식** | `rules.test.ts` 지목 집계 |
+> | `calculateFinalVoteResult` / `allFinalVoted` | **이식** | `rules.test.ts` 최종 투표 (무효표 제외 과반) |
+> | `getGameResult` | **변경** | 기회 상한(D8)이 생겨 결말이 하나 늘었다. `rules.test.ts` |
+> | `resetGame` | **변경** | 1판 완결 → 연속 라운드. `match.test.ts` |
+> | `getLobbyInfo` / `getLobbyRooms` | **변경** | 관전 가능 방도 노출한다(D12). `/api/rooms` |
+> | `createRoom` / `joinRoom` (hostToken) | **폐기** | 호스트 토큰이 사라졌다 — Colyseus가 방 생성자를 안다 |
+> | `getRoomByPlayerId` (socket.id 매핑) | **폐기** | 정체성이 sessionId다 |
+> | `leaveRoom` / `cleanupInactiveRooms` / `addPendingCallback` | **폐기** | 방 생명주기·타이머 정리를 Colyseus가 한다 |
+>
+> **v1에 없어서 새로 만든 영역**: 재접속·일시정지(16), 관전(15), 연속 라운드·점수(18),
+> 연출 페이즈(7), 서버 권위(6), 정보 은닉 바이트 검증(7), 클라이언트 스모크(12).
+>
+> 아래 목록은 **원본 보존용**이다. 개별 체크박스는 채우지 않았다 —
+> 1:1 대응이 아니므로 체크가 오히려 오해를 만든다.
 
 
 ---
