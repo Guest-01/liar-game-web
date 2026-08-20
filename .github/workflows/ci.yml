@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+# E2E(Playwright)는 여기서 돌리지 않는다. 의도적인 결정이다 —
+# 브라우저 없이 도는 계층이 실제 위험을 이미 덮는다:
+#
+#   client/smoke.test.ts       화면 렌더 + 새면 안 될 정보 (2초)
+#   client/integration.test.ts 실제 Colyseus 서버 + 실 WebSocket + 반응성 (3.6초)
+#
+# Playwright가 유일하게 더 잡는 것은 CSS로 요소가 안 보이거나 클릭이 막히는
+# 부류인데, 브라우저 설치 ~170MB와 실행 1~2분을 매 푸시마다 지불할 값어치가
+# 없다고 판단했다. 필요할 때 로컬에서 `npm run test:e2e` 로 돌린다.
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -24,36 +34,9 @@ jobs:
         run: npm run typecheck
 
       # 서버: 정보 은닉 바이트 테스트가 여기 포함된다 — 배포 게이트
-      # 클라이언트: happy-dom 스모크 (rune_outside_svelte 부류를 잡는다, G12)
-      - name: 단위·통합 테스트
+      # 클라이언트: happy-dom 렌더 + 실서버 통합 (G12 부류를 잡는다)
+      - name: 테스트
         run: npm test
 
       - name: 빌드
         run: npm run build
-
-  e2e:
-    runs-on: ubuntu-latest
-    needs: check
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      # ubuntu-latest에는 헤드리스 크롬 의존성이 --with-deps로 설치된다.
-      # (로컬 WSL에서는 libnss3, libnspr4가 따로 필요하다)
-      - name: 브라우저 설치
-        run: npm run test:e2e:install
-
-      - name: 실브라우저 스모크
-        run: npm run test:e2e
-
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-trace
-          path: test-results/
-          retention-days: 7

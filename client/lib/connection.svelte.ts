@@ -10,11 +10,24 @@ import { clearReconnectToken, loadReconnectToken, saveReconnectToken } from "./s
  * 반환하고, 10인 기준 비용이 평균 0.0092ms(60fps 예산의 0.055%)로 무시 가능하다.
  * 세밀한 Schema 콜백을 쓰지 않는다. (docs/spikes/colyseus/FINDINGS.md §9-A)
  */
-const endpoint = import.meta.env.DEV
-  ? `ws://${location.hostname}:5173`
-  : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+function defaultEndpoint(): string {
+  return import.meta.env.DEV
+    ? `ws://${location.hostname}:5173`
+    : `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
+}
 
-export const client = new Client(endpoint);
+let _client: Client | null = null;
+let _endpoint: string | null = null;
+
+/** 테스트가 실제 서버를 가리키게 하기 위한 훅. 프로덕션에서는 호출되지 않는다. */
+export function setEndpoint(url: string): void {
+  _endpoint = url;
+  _client = null;
+}
+
+function client(): Client {
+  return (_client ??= new Client(_endpoint ?? defaultEndpoint()));
+}
 
 export const game = $state<{
   room: Room | null;
@@ -106,7 +119,7 @@ export async function createRoom(opts: {
 }): Promise<string> {
   game.connecting = true;
   try {
-    const room = await client.create("liar", opts);
+    const room = await client().create("liar", opts);
     attach(room);
     return room.roomId;
   } catch (e) {
@@ -128,7 +141,7 @@ export async function joinRoom(roomId: string, nickname: string, password?: stri
   const token = loadReconnectToken(roomId);
   if (token) {
     try {
-      attach(await client.reconnect(token));
+      attach(await client().reconnect(token));
       return;
     } catch {
       clearReconnectToken(roomId);   // 만료됨 — 일반 참가로 진행한다
@@ -136,7 +149,7 @@ export async function joinRoom(roomId: string, nickname: string, password?: stri
   }
 
   try {
-    attach(await client.joinById(roomId, { nickname, password }));
+    attach(await client().joinById(roomId, { nickname, password }));
   } catch (e) {
     game.connecting = false;
     game.error = (e as Error).message || "방에 들어갈 수 없습니다";

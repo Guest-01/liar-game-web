@@ -15,8 +15,7 @@
 ```
 npm install
 npm run dev        # 빈 포트를 찾아 서버+Vite를 함께 띄운다 (기본 2567)
-npm test           # 176개 (서버 + 클라이언트 스모크)
-npm run test:e2e   # 실브라우저 (로컬 WSL은 아래 참조)
+npm test           # 179개 (서버 + 클라이언트 렌더 + 실서버 통합)
 npm run typecheck  # tsc --noEmit + svelte-check
 npm run build      # dist/{server,shared,public}
 ```
@@ -131,21 +130,34 @@ DISCORD_WEBHOOK_URL= NODE_ENV=production node dist/server/index.js
 
 자동화 테스트(`server/feedback.test.ts`)는 `fetch`를 가로채므로 안전하다.
 
-## 테스트 2계층
+## 테스트 구성
 
-| 계층 | 도구 | 잡는 것 | 어디서 |
-|---|---|---|---|
-| 1 | Vitest + happy-dom | 모듈 로드·마운트·렌더·**화면에 새는 정보** | 로컬·CI |
-| 2 | Playwright | 여러 탭 실시간 동기화·실 WebSocket·라우팅 | **CI 전용** |
+**자동화(`npm test`·CI)는 브라우저를 쓰지 않는다.** 전부 3초 안에 돈다.
 
-**로컬 WSL에서 2계층을 돌리려면** 라이브러리 두 개가 필요하다:
+| 파일 | 잡는 것 | 시간 |
+|---|---|---|
+| `shared/rules.test.ts` | 게임 규칙 (프레임워크 무관 순수 함수) | — |
+| `server/rooms/*.test.ts` | 룸 통합 · **정보 은닉 바이트 검증(배포 게이트)** | 90초 |
+| `client/smoke.test.ts` | 모든 화면 렌더 + **화면에 새는 정보** | 2.1초 |
+| `client/integration.test.ts` | **실 Colyseus 서버 + 실 WebSocket + Svelte 반응성** | 3.6초 |
+| `client/conventions.test.ts` | 룬 파일 규약 (G12) | — |
+
+`integration.test.ts`가 핵심이다 — 브라우저 없이 "다른 참가자가 들어오면
+내 화면이 스스로 갱신되는지"까지 확인한다. Node 22에 전역 `WebSocket`이 있어
+SDK가 그대로 붙는다.
+
+### E2E (Playwright) — **수동 전용**
+
+CI와 배포 파이프라인에서 **의도적으로 뺐다.** UI를 크게 손봤을 때 손으로 돌린다.
 
 ```
-sudo apt-get install -y libnss3 libnspr4
-npm run test:e2e:install
+sudo apt-get install -y libnss3 libnspr4   # WSL 최초 1회 (나머지 14개는 이미 있음)
+npm run test:e2e:install                   # 브라우저 내려받기
+npm run test:e2e
 ```
 
-CI(ubuntu-latest)에서는 `--with-deps` 가 알아서 설치한다.
+Playwright가 유일하게 더 잡는 것은 CSS로 요소가 안 보이거나 클릭이 막히는
+부류다. 그 값어치보다 브라우저 설치 ~170MB와 실행 1~2분이 비싸다고 판단했다.
 
 ## M7에서 할 일
 
