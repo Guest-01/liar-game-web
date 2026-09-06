@@ -140,3 +140,52 @@ describe("실 서버 + Svelte 반응성", () => {
     await owner.leave();
   });
 });
+
+/**
+ * 탭 전환·유휴 복귀·와이파이 전환에서 소켓이 떨어졌을 때.
+ *
+ * SDK는 비정상 끊김을 잡아 스스로 다시 붙는다(최대 15회). 앱은 그 과정을
+ * `game.connection`으로 드러내야 한다 — 아니면 사용자는 얼어붙은 화면만 본다.
+ * 재시도가 소진되면(`lost`) 저장된 토큰으로 앱이 직접 복귀한다.
+ */
+describe("소켓 끊김과 복구", () => {
+  const rawClose = (code: number) =>
+    (game.room as unknown as { connection: { close(code: number): void } }).connection.close(code);
+
+  it("★ SDK 자동 재접속 동안 reconnecting 이었다가 connected 로 돌아온다", async () => {
+    await leave();
+    await createRoom({ nickname: "복구", roomName: "복구방", isPublic: true });
+    await wait(300);
+    const sid = game.mySessionId;
+    // SDK는 방이 5초 이상 살아 있어야 자동 재접속을 시도한다 (체크리스트 G6). 테스트에서는 끈다.
+    (game.room as unknown as { reconnection: { minUptime: number } }).reconnection.minUptime = 0;
+
+    rawClose(4010);                    // MAY_TRY_RECONNECT — SDK의 offline 리스너가 쓰는 코드
+    await wait(50);
+    expect(game.connection).toBe("reconnecting");
+
+    await wait(1500);                  // 첫 재시도는 200ms 뒤
+    expect(game.connection).toBe("connected");
+    expect(game.mySessionId, "같은 세션으로 돌아온다").toBe(sid);
+    expect(game.room).not.toBeNull();
+    expect(game.snapshot!.players[sid]!.isConnected).toBe(true);
+  });
+
+  it("★ 재시도가 소진되면 lost 가 되고, joinRoom 이 토큰으로 같은 자리에 복귀한다", async () => {
+    await leave();
+    const roomId = await createRoom({ nickname: "복귀", roomName: "복귀방", isPublic: true });
+    await wait(300);
+    const sid = game.mySessionId;
+
+    rawClose(4001);                    // SDK가 재시도하지 않는 코드 → 즉시 onLeave
+    await wait(200);
+    expect(game.connection).toBe("lost");
+    expect(game.room).toBeNull();
+    expect(game.snapshot, "마지막 상태는 문맥을 위해 남는다").not.toBeNull();
+
+    await joinRoom(roomId, "복귀");   // Room.svelte의 retry()가 하는 일
+    await wait(300);
+    expect(game.connection).toBe("connected");
+    expect(game.mySessionId, "새 참가가 아니라 재접속이다").toBe(sid);
+  });
+});

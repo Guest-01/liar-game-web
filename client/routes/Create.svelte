@@ -4,6 +4,10 @@
   import { createRoom, game } from "../lib/connection.svelte.js";
   import { ROOM_NAME_MAX } from "../../shared/constants.js";
   import { toast } from "../ui/toast.svelte.js";
+  import ArrowLeft from "@lucide/svelte/icons/arrow-left";
+  import Globe from "@lucide/svelte/icons/globe";
+  import Lock from "@lucide/svelte/icons/lock";
+  import Plus from "@lucide/svelte/icons/plus";
 
   let roomName = $state("");
   let isPublic = $state(true);
@@ -33,7 +37,9 @@
 </script>
 
 <main class="container mx-auto px-4 py-8 max-w-lg">
-  <button onclick={() => navigate("/")} class="text-gray-400 hover:text-white mb-8 transition-colors">← 로비로 돌아가기</button>
+  <button onclick={() => navigate("/")} class="text-gray-400 hover:text-white mb-8 transition-colors inline-flex items-center gap-1.5">
+    <ArrowLeft class="w-4 h-4" />로비로 돌아가기
+  </button>
 
   <div class="bg-gray-800 rounded-2xl p-8 shadow-xl">
     <h1 class="text-3xl font-bold text-center mb-8">방 만들기</h1>
@@ -49,9 +55,13 @@
         <span class="block text-sm font-medium text-gray-300 mb-2">공개 설정</span>
         <div class="flex gap-4">
           <button type="button" onclick={() => (isPublic = true)}
-                  class="flex-1 p-4 rounded-lg transition-all {isPublic ? 'bg-primary ring-2 ring-primary/50' : 'bg-gray-700'}">🌐 공개</button>
+                  class="flex-1 p-4 rounded-lg transition-all inline-flex items-center justify-center gap-2 {isPublic ? 'bg-primary ring-2 ring-primary/50' : 'bg-gray-700'}">
+            <Globe class="w-5 h-5" />공개
+          </button>
           <button type="button" onclick={() => (isPublic = false)}
-                  class="flex-1 p-4 rounded-lg transition-all {!isPublic ? 'bg-primary ring-2 ring-primary/50' : 'bg-gray-700'}">🔒 비공개</button>
+                  class="flex-1 p-4 rounded-lg transition-all inline-flex items-center justify-center gap-2 {!isPublic ? 'bg-primary ring-2 ring-primary/50' : 'bg-gray-700'}">
+            <Lock class="w-5 h-5" />비공개
+          </button>
         </div>
       </div>
 
@@ -67,8 +77,8 @@
       <p class="text-sm text-gray-400 text-center">게임 설정은 대기실에서 변경할 수 있습니다</p>
 
       <button type="submit" disabled={busy}
-              class="w-full py-4 bg-gradient-to-r from-primary to-secondary rounded-lg font-bold text-lg disabled:opacity-50">
-        {busy ? "생성 중..." : "방 만들기"}
+              class="w-full py-4 bg-gradient-to-r from-primary to-secondary rounded-lg font-bold text-lg disabled:opacity-50 inline-flex items-center justify-center gap-2">
+        {#if !busy}<Plus class="w-5 h-5" />{/if}{busy ? "생성 중..." : "방 만들기"}
       </button>
     </form>
   </div>

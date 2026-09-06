@@ -1,5 +1,8 @@
 <script lang="ts">
   import { game, isHost, nicknameOf, send } from "../lib/connection.svelte.js";
+  import PartyPopper from "@lucide/svelte/icons/party-popper";
+  import Drama from "@lucide/svelte/icons/drama";
+  import CircleSlash from "@lucide/svelte/icons/circle-slash";
 
   const s = $derived(game.snapshot!);
   const voided = $derived(s.roundEndReason === "voided");
@@ -14,10 +17,10 @@
 </script>
 
 <div class="text-center py-8 space-y-6">
-  <h2 class="text-3xl font-bold">
-    {#if voided}라운드 무효
-    {:else if s.roundWinner === "citizen"}🎉 시민 승리!
-    {:else}🎭 라이어 승리!{/if}
+  <h2 class="text-3xl font-bold flex items-center justify-center gap-3">
+    {#if voided}<CircleSlash class="w-8 h-8 text-gray-500" />라운드 무효
+    {:else if s.roundWinner === "citizen"}<PartyPopper class="w-8 h-8 text-success" />시민 승리!
+    {:else}<Drama class="w-8 h-8 text-danger" />라이어 승리!{/if}
   </h2>
   <p class="text-gray-400">{reasonText[s.roundEndReason] ?? ""}</p>
 

@@ -4,6 +4,7 @@
    * 사용자가 "일주일간 보지 않기"를 선택하면 그동안 감춘다.
    */
   import { toast } from "./toast.svelte.js";
+  import MessageCircle from "@lucide/svelte/icons/message-circle";
 
   let { roomId = "" }: { roomId?: string } = $props();
 
@@ -60,8 +61,8 @@
 
 {#if available && !hidden}
   <button onclick={() => (open = true)}
-          class="text-xs text-gray-500 hover:text-gray-300 transition-colors">
-    피드백
+          class="text-xs text-gray-500 hover:text-gray-300 transition-colors inline-flex items-center gap-1">
+    <MessageCircle class="w-3.5 h-3.5" />피드백
   </button>
 {/if}
 
@@ -76,7 +77,9 @@
                   class="mt-4 px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">닫기</button>
         </div>
       {:else}
-        <h2 class="text-xl font-bold mb-4">피드백 보내기</h2>
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+          <MessageCircle class="w-5 h-5 text-primary" />피드백 보내기
+        </h2>
         <p class="text-gray-400 text-sm mb-4">게임에 대한 의견을 들려주세요!</p>
 
         <div class="flex justify-center gap-4 mb-4">

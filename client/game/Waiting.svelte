@@ -5,8 +5,32 @@
     MAX_PLAYERS, MIN_PLAYERS, ROUND_COUNT_OPTIONS,
   } from "../../shared/constants.js";
 
-  const roundLabel = (v: number) => (v === 0 ? "무제한" : `${v}판`);
   import { RANDOM_CATEGORY } from "../../shared/rules.js";
+  import { toast } from "../ui/toast.svelte.js";
+  import Link from "@lucide/svelte/icons/link";
+  import Share2 from "@lucide/svelte/icons/share-2";
+  import Copy from "@lucide/svelte/icons/copy";
+
+  const roundLabel = (v: number) => (v === 0 ? "무제한" : `${v}판`);
+
+  // 초대 링크. 비밀번호는 URL에 싣지 않는다 (체크리스트 C1) — 따로 알려주게 안내한다.
+  const inviteUrl = $derived(`${location.origin}/room/${game.room?.roomId ?? ""}`);
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  async function invite() {
+    const text = `라이어 게임에 초대합니다 — ${s.name}`;
+    try {
+      if (canShare) {
+        await navigator.share({ title: "라이어 게임", text, url: inviteUrl });
+        return;
+      }
+      await navigator.clipboard.writeText(inviteUrl);
+      toast(s.isPublic ? "초대 링크를 복사했습니다" : "초대 링크를 복사했습니다. 비밀번호는 따로 알려주세요", "success");
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;   // 공유 시트를 닫은 것
+      toast("복사하지 못했습니다. 주소창의 링크를 직접 공유해 주세요", "error");
+    }
+  }
 
   let categories = $state<string[]>([]);
   $effect(() => {
@@ -25,6 +49,20 @@
 </script>
 
 <div class="space-y-6">
+  <div class="bg-gray-800 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
+    <Link class="w-4 h-4 text-gray-400 shrink-0" />
+    <div class="flex-1 min-w-0">
+      <p class="text-sm font-semibold">친구 초대</p>
+      <p class="text-xs text-gray-500 truncate">
+        {inviteUrl}{#if !s.isPublic} · 비밀번호는 따로 알려주세요{/if}
+      </p>
+    </div>
+    <button onclick={invite}
+            class="px-3 py-2 bg-primary hover:bg-primary/80 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 shrink-0">
+      {#if canShare}<Share2 class="w-4 h-4" />공유{:else}<Copy class="w-4 h-4" />링크 복사{/if}
+    </button>
+  </div>
+
   <div class="bg-gray-800 rounded-xl p-6">
     <h3 class="font-semibold mb-4">게임 설정</h3>
 

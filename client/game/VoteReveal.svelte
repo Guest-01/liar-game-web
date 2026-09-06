@@ -62,7 +62,7 @@
           <p class="text-xl text-warning">과반수 미달</p>
         {/if}
         <p class="text-gray-400 mt-3">
-          <span class="font-mono font-bold">{countdown}</span>초 후
+          <span class="tabular-nums font-bold">{countdown}</span>초 후
           {confirmed ? "라이어를 공개합니다…" : "토론으로 돌아갑니다…"}
         </p>
       </div>

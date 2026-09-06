@@ -1,5 +1,6 @@
 <script lang="ts">
   import { game } from "../lib/connection.svelte.js";
+  import TimerIcon from "@lucide/svelte/icons/timer";
 
   const seconds = $derived(Math.ceil(game.remainingMs / 1000));
   const warning = $derived(seconds <= 5 && seconds > 0);
@@ -8,6 +9,7 @@
 
 {#if game.snapshot && game.snapshot.phaseEndsAt > 0}
   <div class="inline-flex items-center gap-2 px-4 py-2 bg-gray-800 rounded-full">
-    <span class="text-xl font-mono font-bold" class:timer-warning={warning}>{label}</span>
+    <TimerIcon class="w-4 h-4 text-gray-400" />
+    <span class="text-xl font-bold tabular-nums" class:timer-warning={warning}>{label}</span>
   </div>
 {/if}

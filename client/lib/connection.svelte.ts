@@ -29,19 +29,31 @@ function client(): Client {
   return (_client ??= new Client(_endpoint ?? defaultEndpoint()));
 }
 
+/**
+ * 소켓 상태.
+ *
+ * - `connected`     정상
+ * - `reconnecting`  소켓이 떨어져 SDK가 스스로 다시 붙는 중 (최대 15회, 지수 백오프).
+ *                   탭 전환·유휴 복귀·와이파이 전환이 대부분 여기서 조용히 끝난다.
+ * - `lost`          SDK 재시도가 소진됐거나 서버가 거부했다. 앱이 직접 다시 들어가야 한다.
+ *                   (`joinRoom`이 저장된 토큰으로 복귀를 시도한다)
+ */
+export type ConnectionStatus = "connected" | "reconnecting" | "lost";
+
 export const game = $state<{
   room: Room | null;
   snapshot: RoomSnapshot | null;
   mySessionId: string;
   error: string;
   connecting: boolean;
+  connection: ConnectionStatus;
   /** 페이즈 남은 시간(ms). 서버가 준 상대 시간을 수신 시각 기준으로 센다. */
   remainingMs: number;
   /** 재접속 유예 남은 시간(ms). 같은 방식으로 센다. */
   graceMs: number;
 }>({
   room: null, snapshot: null, mySessionId: "", error: "", connecting: false,
-  remainingMs: 0, graceMs: 0,
+  connection: "connected", remainingMs: 0, graceMs: 0,
 });
 
 let ticker: ReturnType<typeof setInterval> | null = null;
@@ -63,6 +75,7 @@ function attach(room: Room): void {
   game.mySessionId = room.sessionId;
   game.error = "";
   game.connecting = false;
+  game.connection = "connected";
   saveReconnectToken(room.roomId, (room as unknown as { reconnectionToken: string }).reconnectionToken);
 
   room.onStateChange((state: unknown) => {
@@ -71,14 +84,33 @@ function attach(room: Room): void {
     startGraceCountdown();
   });
 
+  // SDK가 비정상 끊김(1001·1005·1006·4010)을 잡아 스스로 재접속하는 동안.
+  // 이 신호를 받지 않으면 사용자는 얼어붙은 화면만 본다.
+  room.onDrop(() => {
+    game.connection = "reconnecting";
+    stopCountdown();
+  });
+  room.onReconnect(() => {
+    game.connection = "connected";
+    // 재접속 직후 서버가 전체 상태를 다시 보내므로 카운트다운은 onStateChange가 되살린다.
+  });
+
   room.onError((_code: number, message?: string) => { game.error = message ?? "오류가 발생했습니다"; });
   room.onLeave((code: number) => {
     stopCountdown();
     stopGraceCountdown();
     attachedRoomId = null;
     game.room = null;
-    // 정상 퇴장(4000)이면 토큰을 버린다. 비정상이면 새로고침 복귀를 위해 남긴다.
-    if (code === 4000) clearReconnectToken(room.roomId);
+    if (code === 4000) {
+      // 정상 퇴장 — 토큰을 버린다.
+      clearReconnectToken(room.roomId);
+      game.connection = "connected";
+    } else {
+      // SDK 재시도 소진 또는 서버 거부. 토큰은 남긴다 — 유예가 남아 있으면
+      // joinRoom()이 그것으로 복귀한다. 스냅샷은 문맥을 위해 남겨 두되
+      // 배너로 "지금 보이는 것은 멈춘 화면"임을 알린다.
+      game.connection = "lost";
+    }
   });
 }
 
@@ -191,6 +223,7 @@ export async function leave(): Promise<void> {
   await game.room?.leave();
   game.room = null;
   game.snapshot = null;
+  game.connection = "connected";
 }
 
 // ── 파생 헬퍼 ────────────────────────────────────────

@@ -36,6 +36,7 @@
   "devDependencies": {
     "@colyseus/sdk": "0.17.43",
     "@colyseus/testing": "0.17.11",
+    "@lucide/svelte": "1.41.0",
     "@playwright/test": "1.62.1",
     "@sveltejs/vite-plugin-svelte": "7.3.0",
     "@tailwindcss/vite": "4.3.3",

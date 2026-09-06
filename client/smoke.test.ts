@@ -30,6 +30,9 @@ import Timer from "./game/Timer.svelte";
 import PauseBanner from "./game/PauseBanner.svelte";
 import SpectatorBanner from "./game/SpectatorBanner.svelte";
 import OrderReveal from "./fx/OrderReveal.svelte";
+import PeekWord from "./game/PeekWord.svelte";
+import MobileChat from "./game/MobileChat.svelte";
+import PhaseProgress from "./game/PhaseProgress.svelte";
 
 beforeEach(() => {
   stubFetch({ "/api/categories": { categories: ["음식", "동물"] }, "/api/rooms": { rooms: [] } });
@@ -64,6 +67,33 @@ describe("모든 페이즈 화면이 마운트된다", () => {
     expect(renderWith(PlayerList, s).length).toBeGreaterThan(0);
     expect(renderWith(Chat, s).length).toBeGreaterThan(0);
     expect(renderWith(Timer, s, { remainingMs: 12_000 })).toContain("0:12");
+    expect(renderWith(PhaseProgress, s, { remainingMs: 15_000 })).toContain('width: 50%');
+    expect(renderWith(MobileChat, s)).toContain("아직 대화가 없습니다");
+  });
+});
+
+describe("헤더의 제시어는 누르고 있는 동안만 보인다", () => {
+  const citizen = snapshot({
+    phase: "discussion",
+    players: { ...snapshot().players, a: player("a", "앨리스", { isHost: true, myWord: "김치찌개" }) },
+  });
+  const liar = snapshot({
+    phase: "discussion",
+    players: { ...snapshot().players, a: player("a", "앨리스", { isHost: true, amILiar: true }) },
+  });
+
+  it("기본 상태에서는 제시어도 라이어 여부도 DOM에 없다", () => {
+    expect(renderWith(PeekWord, citizen)).not.toContain("김치찌개");
+    expect(renderWith(PeekWord, citizen)).toContain("제시어 보기");
+    expect(renderWith(PeekWord, liar)).not.toContain("라이어");
+  });
+
+  it("관전자에게는 버튼 자체가 없다", () => {
+    const s = snapshot({
+      phase: "discussion",
+      players: { ...snapshot().players, e: player("e", "관전자", { isSpectator: true }) },
+    });
+    expect(renderWith(PeekWord, s, { me: "e" })).toBe("<!---->");
   });
 });
 

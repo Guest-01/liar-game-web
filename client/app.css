@@ -12,15 +12,44 @@
   --color-accent: #f59e0b;
   --color-danger: #ef4444;
   --color-success: #22c55e;
+  /* 일시정지 배너·"설명 다시하기" 등이 `warning`을 쓰는데 정의가 없어 배경이 비어 있었다. */
+  --color-warning: #eab308;
 
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  /* 화면의 숫자(타이머·점수)는 모노스페이스가 아니라 `tabular-nums`로 폭을 고정한다.
+     Pretendard가 고정폭 숫자를 지원하므로 서체를 추가로 싣지 않는다.
+     아래는 방 ID 같은 진짜 코드용이며, 시스템 서체만 나열한다 — v1처럼 선언만
+     해 두고 로드하지 않은 웹폰트를 첫 후보로 두면 Windows에서 Courier New로 떨어진다. */
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'SF Mono', Menlo, monospace;
 
   --animate-bounce-slow: bounce-slow 2s ease-in-out infinite;
 
   @keyframes bounce-slow {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-4px); }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   기본 요소 — Tailwind 4의 preflight는 v3와 달리 버튼에 cursor: pointer를
+   주지 않는다 (브라우저 기본값으로 되돌림). v1은 v3였으므로 있었다.
+   ───────────────────────────────────────────────────────────── */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+  /* v1의 눌림 효과 */
+  button:not(:disabled):active {
+    transform: scale(0.98);
+  }
+  /* <details>의 기본 삼각형 마커를 없앤다. 아이콘으로 대체한다. */
+  summary {
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
   }
 }
 

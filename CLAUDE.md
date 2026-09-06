@@ -15,9 +15,9 @@
 ```
 npm install
 npm run dev        # 빈 포트를 찾아 서버+Vite를 함께 띄운다 (기본 2567)
-npm test           # 181개 전체 (약 2분)
-npm run test:client  #  29개, 8초 — UI를 만지는 중이라면 이것만
-npm run test:server  # 152개, 2분
+npm test           # 193개 전체 (약 2분)
+npm run test:client  #  33개, 8초 — UI를 만지는 중이라면 이것만
+npm run test:server  # 160개, 2분
 npm run typecheck  # tsc --noEmit + svelte-check
 npm run build      # dist/{server,shared,public}
 ```
@@ -144,7 +144,7 @@ DISCORD_WEBHOOK_URL= NODE_ENV=production node dist/server/index.js
 | `shared/rules.test.ts` | 게임 규칙 (프레임워크 무관 순수 함수) | — |
 | `server/rooms/*.test.ts` | 룸 통합 · **정보 은닉 바이트 검증(배포 게이트)** | 90초 |
 | `client/smoke.test.ts` | 모든 화면 렌더 + **화면에 새는 정보** | 2.1초 |
-| `client/integration.test.ts` | **실 Colyseus 서버 + 실 WebSocket + Svelte 반응성** | 3.6초 |
+| `client/integration.test.ts` | **실 Colyseus 서버 + 실 WebSocket + Svelte 반응성** · 소켓 끊김→SDK 자동 재접속→복귀 | 6초 |
 | `client/conventions.test.ts` | 룬 파일 규약 (G12) | — |
 
 `integration.test.ts`가 핵심이다 — 브라우저 없이 "다른 참가자가 들어오면

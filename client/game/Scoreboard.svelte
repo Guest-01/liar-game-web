@@ -40,7 +40,7 @@
         {#if p.roundDelta > 0}
           <span class="text-success text-sm font-semibold">+{p.roundDelta}</span>
         {/if}
-        <span class="w-10 text-right text-xl font-bold font-mono">{p.score}</span>
+        <span class="w-10 text-right text-xl font-bold tabular-nums">{p.score}</span>
       </li>
     {/each}
   </ol>
