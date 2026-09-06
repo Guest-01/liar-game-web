@@ -304,6 +304,13 @@ v1에 없던 기능이라 과거 버그는 없지만, **구조적으로 위험�
 - **왜**: `@colyseus/core@0.16.25`는 `workspace:^` 미해결 상태로 배포되어 **설치 자체가 불가능**했다.
   SDK의 `next` 태그는 이미 0.18이다. 버전 이동이 빠르고 QA가 균일하지 않다.
 - **테스트**: `npm ci`가 깨끗한 환경에서 성공한다 (CI에서 이미 검증됨).
+- **⚠️ Windows에서 `npm install`로 의존성을 추가하면 lockfile이 깨진다 (2026-09-06 실제 발생)**:
+  리눅스 전용 선택 의존성(`@emnapi/core`·`@emnapi/runtime`, `@tailwindcss/oxide` 계열)
+  항목이 lockfile에서 지워져 CI의 `npm ci`가 "not in sync"로 거부한다.
+  `--package-lock-only`나 lockfile 재생성으로도 복구되지 않는다.
+  **대처**: 직전 커밋의 lockfile을 되살리고(`git checkout HEAD~1 -- package-lock.json`)
+  새 패키지 항목만 손으로 얹는다 (루트 `devDependencies` + `node_modules/<pkg>` 두 곳).
+  로컬에서 `npm ci --dry-run`이 "in sync"면 된다.
 
 ### G5. 클라이언트 SDK 패키지명
 - [x] `colyseus.js`가 아니라 **`@colyseus/sdk`** 를 쓴다.
