@@ -85,7 +85,14 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     }
     const nick = parsed.data.nickname;
     for (const p of this.state.players.values()) {
-      if (p.nickname === nick) throw new Error("이미 같은 닉네임이 사용 중입니다.");
+      if (p.nickname !== nick) continue;
+      // 유예 중인 자리와의 충돌은 십중팔구 토큰을 잃은 본인이다 (브라우저를 닫았다
+      // 다시 연 경우). 유예가 끝나면 들어올 수 있다는 것을 알려준다.
+      throw new Error(
+        p.isConnected
+          ? "이미 같은 닉네임이 사용 중입니다."
+          : "같은 닉네임이 재접속을 기다리는 중입니다. 잠시 후 다시 시도하세요.",
+      );
     }
     // 라운드 중이면 관전자로 받는다.
     // ★ 불변식: 플레이어 + 관전자 ≤ 최대 인원 (D11)
@@ -198,6 +205,14 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
       if (wasLiar && this.state.defendantId !== "") {
         this.system("지목된 라이어가 나갔습니다");
         this.endRound("citizen", "liar-executed-wrong-guess");
+        return;
+      }
+      //    같은 원칙이 시민 피고에게도 적용된다. 처형이 확정된 뒤(개표 연출 중)
+      //    피고가 나가면 이미 라이어가 이긴 것이다. 여기서 "피고 이탈 → 재토론"으로
+      //    흘러가면 시민 쪽이 나가서 패배를 무효화할 수 있다.
+      if (wasDefendant && this.state.executionConfirmed) {
+        this.system("처형된 시민이 나갔습니다");
+        this.endRound("liar", "citizen-executed");
         return;
       }
       // ② 인원 미달 — 아래 어떤 복구도 불가능하다
@@ -514,24 +529,30 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     const redoAllowed = this.state.descriptionAttempts < 2;
     if (targetId === REDO_TARGET) {
       if (!redoAllowed) return;                               // 기회 소진 시 선택지 없음
-    } else if (!this.state.players.has(targetId)) {
-      return;
+    } else {
+      // 지목 대상은 **플레이어**여야 한다. 관전자는 `players` 맵에 같이 있으므로
+      // 존재 여부만 보면 통과한다. 관전자가 피고가 되면 변론을 할 수 없다.
+      const target = this.state.players.get(targetId);
+      if (!target || target.isSpectator) return;
     }
 
     player.nominatedId = targetId;
     this.nominations.set(player.id, targetId);
-
-    // 전원 지목 완료 → 조기 종료
-    if (this.players().every((p) => p.nominatedId !== "")) {
-      const remaining = this.timer.remainingMs();
-      if (remaining > ALL_NOMINATED_GRACE_MS) {
-        this.timer.clear();
-        const d = this.clock.setTimeout(() => this.closeDiscussion(), ALL_NOMINATED_GRACE_MS);
-        this.timer.set(d, ALL_NOMINATED_GRACE_MS);
-        this.system("전원 지목 완료 — 곧 토론이 종료됩니다");
-      }
-    }
+    this.maybeCloseDiscussionEarly();
     this.refresh();
+  }
+
+  /** 전원이 지목했으면 토론을 곧 끝낸다. 지목 시와 이탈 확정 시 양쪽에서 부른다. */
+  private maybeCloseDiscussionEarly(): void {
+    if (this.state.phase !== "discussion") return;
+    if (!this.players().every((p) => p.nominatedId !== "")) return;
+    const remaining = this.timer.remainingMs();
+    if (remaining > ALL_NOMINATED_GRACE_MS) {
+      this.timer.clear();
+      const d = this.clock.setTimeout(() => this.closeDiscussion(), ALL_NOMINATED_GRACE_MS);
+      this.timer.set(d, ALL_NOMINATED_GRACE_MS);
+      this.system("전원 지목 완료 — 곧 토론이 종료됩니다");
+    }
   }
 
   private closeDiscussion(): void {
@@ -720,17 +741,45 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     this.state.roundEndReason = "";
   }
 
-  /** 설명 도중 이탈로 순서 배열과 인덱스가 어긋나는 것을 바로잡는다. (체크리스트 A3) */
+  /**
+   * 이탈 확정 뒤, 나간 사람 때문에 페이즈가 멈춰 있지 않게 한다.
+   *
+   * "전원 완료" 조건은 메시지가 올 때만 평가된다. 마지막 미완료자가 나가면
+   * 남은 전원은 이미 완료했는데 아무 메시지도 오지 않아 영원히 멈춘다.
+   * 타이머가 있는 페이즈는 만료로 복구되지만 **제시어 확인은 무기한**이다.
+   */
   private reconcileAfterLeave(): void {
-    const alive = this.state.descriptionOrder.filter((id) => this.state.players.has(id));
-    if (alive.length !== this.state.descriptionOrder.length) {
-      this.state.descriptionOrder = new ArraySchema<string>(...alive);
-      if (this.state.currentDescriberIndex > this.state.descriptionOrder.length) {
-        this.state.currentDescriberIndex = this.state.descriptionOrder.length;
+    switch (this.state.phase) {
+      case "word-check":
+        if (this.players().every((p) => p.hasCheckedWord)) {
+          this.state.descriptionAttempts = 1;
+          this.beginDescriptionRound(false);
+        }
+        return;
+
+      case "description":
+      case "description-reveal": {
+        // 순서 배열과 인덱스가 어긋나는 것을 바로잡는다. (체크리스트 A3)
+        const alive = this.state.descriptionOrder.filter((id) => this.state.players.has(id));
+        if (alive.length !== this.state.descriptionOrder.length) {
+          this.state.descriptionOrder = new ArraySchema<string>(...alive);
+          if (this.state.currentDescriberIndex > this.state.descriptionOrder.length) {
+            this.state.currentDescriberIndex = this.state.descriptionOrder.length;
+          }
+        }
+        if (this.state.phase === "description" && !this.currentDescriberId()) {
+          this.startDiscussion();
+        }
+        return;
       }
-    }
-    if (this.state.phase === "description" && !this.currentDescriberId()) {
-      this.startDiscussion();
+
+      case "discussion":
+        this.maybeCloseDiscussionEarly();
+        return;
+
+      case "final-vote":
+        if (this.eligibleVoters().every((p) => p.hasFinalVoted)) this.closeFinalVote();
+        return;
     }
   }
 
@@ -760,11 +809,21 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     // 라운드 진행 중에는 관전자만 강퇴할 수 있다.
     // 플레이어를 빼면 라운드가 깨진다.
     if (IN_ROUND_PHASES.has(this.state.phase as Phase) && !p.isSpectator) return;
+    // 유예 중인 사람은 `this.clients`에 없다. 재접속 대기를 거절하면
+    // onLeave의 catch 분기가 이탈 확정을 처리한다.
+    const waiting = this.waiting.get(targetId);
+    if (waiting) { waiting.reject(); return; }
     this.clients.find((c) => c.sessionId === targetId)?.leave(4000);
   }
 
+  /**
+   * 호스트를 넘긴다. **접속 중인** 사람을 우선한다.
+   * 유예 중인 사람이 호스트가 되면 "기다리지 않고 계속"이나 "다음 라운드"를
+   * 누를 사람이 없어 그가 돌아오거나 이탈 확정될 때까지 전원이 멈춘다.
+   */
   private reassignHost(): void {
-    const next = this.players()[0];
+    const candidates = this.players();
+    const next = candidates.find((p) => p.isConnected) ?? candidates[0];
     if (next) {
       next.isHost = true;
       this.system(`${next.nickname}님이 새 호스트가 되었습니다`);
