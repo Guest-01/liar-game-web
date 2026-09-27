@@ -1,6 +1,11 @@
 <script lang="ts">
-  import { game, joinRoom, leave } from "../lib/connection.svelte.js";
-  import { getNickname, takePassword, clearPassword } from "../lib/session.js";
+  import { game, isAttachedTo, joinRoom, leave } from "../lib/connection.svelte.js";
+  import {
+    clearPassword, getNickname, isFirstVisit, isValidNickname, loadReconnectToken, setNickname, takePassword,
+  } from "../lib/session.js";
+  import { generateRandomNickname } from "../../shared/nicknames.js";
+  import type { LobbyRoom } from "../../shared/snapshot.js";
+  import JoinGate from "../ui/JoinGate.svelte";
   import { navigate } from "../router.svelte.js";
   import { toast } from "../ui/toast.svelte.js";
   import { IN_ROUND_PHASES } from "../../shared/types.js";
@@ -35,20 +40,85 @@
 
   let { roomId }: { roomId: string } = $props();
 
+  /**
+   * 참가 전에 묻는 입장 화면(닉네임·비밀번호). null이면 곧장 참가한다.
+   * 초대 링크는 로비를 거치지 않으므로, 로비가 하던 일(닉네임 정하기·비밀번호 묻기)을
+   * 여기서 한다. 서버가 거절해도 로비로 튕기지 않고 이 화면에서 사유를 보인다.
+   */
+  let gate = $state<{ room: LobbyRoom; nickname: string; error: string; busy: boolean } | null>(null);
+
+  async function fetchRoom(id: string): Promise<LobbyRoom | null> {
+    try {
+      const res = await fetch(`/api/rooms/${encodeURIComponent(id)}`);
+      if (!res.ok) return null;
+      return ((await res.json()) as { room?: LobbyRoom }).room ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ⚠️ 이 effect는 동기 구간에서 $state를 읽지 않는다 (D7). isAttachedTo·세션 저장소는
+  //    평범한 값이고, game.error는 await 뒤에서만 읽으므로 추적되지 않는다.
   $effect(() => {
     let cancelled = false;
     (async () => {
+      // 방을 만든 직후(이미 연결됨)나 새로고침·복귀(재접속 토큰)는 묻지 않는다
+      const returning = isAttachedTo(roomId) || loadReconnectToken(roomId) !== null;
+      if (!returning) {
+        const room = await fetchRoom(roomId);
+        if (cancelled) return;
+        if (!room) {
+          toast("방을 찾을 수 없습니다", "error");
+          navigate("/", true);
+          return;
+        }
+        // isFirstVisit()는 getNickname()이 닉네임을 저장하기 **전에** 물어야 한다
+        const firstVisit = isFirstVisit();
+        const needPassword = !room.isPublic && takePassword(roomId) === undefined;
+        if (firstVisit || needPassword) {
+          gate = {
+            room, error: "", busy: false,
+            nickname: firstVisit ? generateRandomNickname() : getNickname(),
+          };
+          return;
+        }
+      }
       try {
         await joinRoom(roomId, getNickname(), takePassword(roomId));
         clearPassword(roomId);
       } catch {
         if (cancelled) return;
+        clearPassword(roomId);
+        // 방은 있는데 거절됐다(비밀번호·닉네임 중복·정원) → 입장 화면에서 다시 묻는다
+        const room = await fetchRoom(roomId);
+        if (cancelled) return;
+        if (room) {
+          gate = { room, nickname: getNickname(), busy: false, error: game.error || "방에 들어갈 수 없습니다" };
+          return;
+        }
         toast(game.error || "방에 들어갈 수 없습니다", "error");
         navigate("/", true);
       }
     })();
     return () => { cancelled = true; void leave(); };
   });
+
+  async function enterFromGate(nickname: string, password: string | undefined) {
+    if (!gate || gate.busy) return;
+    if (!isValidNickname(nickname)) { gate.error = "닉네임은 2~10자여야 합니다"; return; }
+    setNickname(nickname);
+    gate.busy = true;
+    gate.error = "";
+    try {
+      await joinRoom(roomId, nickname, password);
+      gate = null;
+    } catch {
+      if (gate) {
+        gate.busy = false;
+        gate.error = game.error || "방에 들어갈 수 없습니다";
+      }
+    }
+  }
 
   /**
    * SDK 자동 재접속이 소진된 뒤(`lost`)의 복귀 경로. 저장된 토큰으로 유예 안에
@@ -98,7 +168,10 @@
   }
 </script>
 
-{#if !s}
+{#if !s && gate}
+  <JoinGate room={gate.room} nickname={gate.nickname} error={gate.error} busy={gate.busy}
+            onsubmit={enterFromGate} oncancel={() => navigate("/")} />
+{:else if !s}
   <div class="fixed inset-0 flex items-center justify-center">
     <p class="text-gray-400">{game.error || "연결 중…"}</p>
   </div>

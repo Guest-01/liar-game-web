@@ -69,6 +69,9 @@ let graceTicker: ReturnType<typeof setInterval> | null = null;
  */
 let attachedRoomId: string | null = null;
 
+/** 이미 이 방에 붙어 있는가 (방을 만든 직후). $state가 아니므로 $effect에서 읽어도 된다. */
+export const isAttachedTo = (roomId: string): boolean => attachedRoomId === roomId;
+
 function attach(room: Room): void {
   attachedRoomId = room.roomId;
   game.room = room;

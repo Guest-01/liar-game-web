@@ -122,9 +122,15 @@ describe("실 서버 + Svelte 반응성", () => {
       .create("liar", { nickname: "주인", roomName: "루프방", isPublic: true });
 
     localStorage.setItem("nickname", "루프");
-    // 대기실(Waiting.svelte)이 /api/categories 를 부른다. 이 테스트에는 HTTP 서버가
-    // 없어서 happy-dom 기본 주소(localhost:3000)로 나가 ECONNREFUSED 로그를 남긴다.
-    vi.stubGlobal("fetch", async () => Response.json({ categories: [] }));
+    // 방 화면은 참가 전에 /api/rooms/:id 로 방 요약을, 대기실(Waiting.svelte)은
+    // /api/categories 를 부른다. 이 테스트에는 HTTP 서버가 없어서 그대로 두면
+    // happy-dom 기본 주소(localhost:3000)로 나가 ECONNREFUSED 로그를 남긴다.
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) =>
+      String(input).includes("/api/rooms/")
+        ? Response.json({ room: { roomId: owner.roomId, name: "루프방", isPublic: true,
+            playerCount: 1, maxPlayers: 10, gameMode: "normal", category: "랜덤",
+            inProgress: false, canSpectate: false } })
+        : Response.json({ categories: [] }));
     const host = document.createElement("div");
     document.body.appendChild(host);
     const app = mount(Room, { target: host, props: { roomId: owner.roomId } });
@@ -191,5 +197,88 @@ describe("소켓 끊김과 복구", () => {
     await wait(300);
     expect(game.connection).toBe("connected");
     expect(game.mySessionId, "새 참가가 아니라 재접속이다").toBe(sid);
+  });
+});
+
+/**
+ * 초대 링크는 로비를 거치지 않는다. 로비가 하던 일(닉네임·비밀번호 묻기)을
+ * 방 화면이 참가 **전에** 해야 한다. 예전에는 비공개 방 링크로 들어오면
+ * 비밀번호 없이 참가를 시도해 "비밀번호가 틀렸습니다"와 함께 로비로 튕겼다.
+ */
+describe("초대 링크로 들어오기", () => {
+  const summary = (roomId: string, isPublic: boolean) => ({
+    room: { roomId, name: "초대방", isPublic, playerCount: 1, maxPlayers: 10,
+            gameMode: "normal", category: "랜덤", inProgress: false, canSpectate: false },
+  });
+  const fill = (el: Element | null, value: string) => {
+    const input = el as HTMLInputElement;
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  const submit = (host: HTMLElement) =>
+    host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+
+  async function openLink(roomId: string, isPublic: boolean) {
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) =>
+      Response.json(String(input).includes("/api/rooms/") ? summary(roomId, isPublic) : { categories: [] }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = mount(Room, { target: host, props: { roomId } });
+    await wait(300);
+    flushSync();
+    return {
+      host,
+      async close() { unmount(app); host.remove(); vi.unstubAllGlobals(); await leave().catch(() => {}); },
+    };
+  }
+
+  it("★ 비공개 방은 참가 전에 비밀번호를 묻고, 틀리면 그 자리에서 알려준다", async () => {
+    await leave();
+    const { Client } = await import("@colyseus/sdk");
+    const owner = await new Client(`ws://localhost:${PORT}`)
+      .create("liar", { nickname: "주인", roomName: "초대방", isPublic: false, password: "1234" });
+    localStorage.setItem("nickname", "초대손님");
+
+    const page = await openLink(owner.roomId, false);
+    expect(page.host.querySelector('input[type="password"]'), "비밀번호를 묻는다").not.toBeNull();
+    expect(game.room, "묻기 전에는 참가하지 않는다").toBeNull();
+
+    fill(page.host.querySelector('input[type="password"]'), "0000");
+    submit(page.host);
+    await wait(500);
+    flushSync();
+    expect(page.host.innerHTML, "로비로 튕기지 않고 사유를 보인다").toContain("비밀번호가 틀렸습니다");
+    expect(game.room).toBeNull();
+
+    fill(page.host.querySelector('input[type="password"]'), "1234");
+    submit(page.host);
+    await wait(500);
+    expect(game.room, "맞는 비밀번호로 들어간다").not.toBeNull();
+    expect(game.snapshot!.players[game.mySessionId]!.nickname).toBe("초대손님");
+
+    await page.close();
+    await owner.leave();
+  });
+
+  it("처음 온 사람에게는 닉네임부터 묻는다", async () => {
+    await leave();
+    const { Client } = await import("@colyseus/sdk");
+    const owner = await new Client(`ws://localhost:${PORT}`)
+      .create("liar", { nickname: "주인", roomName: "초대방", isPublic: true });
+    localStorage.removeItem("nickname");
+
+    const page = await openLink(owner.roomId, true);
+    expect(game.room, "닉네임을 정하기 전에는 참가하지 않는다").toBeNull();
+    expect(page.host.querySelector('input[type="password"]'), "공개 방은 비밀번호를 묻지 않는다").toBeNull();
+
+    fill(page.host.querySelector("input"), "새손님");
+    submit(page.host);
+    await wait(500);
+    expect(game.room).not.toBeNull();
+    expect(game.snapshot!.players[game.mySessionId]!.nickname).toBe("새손님");
+    expect(localStorage.getItem("nickname"), "정한 닉네임은 다음에도 쓴다").toBe("새손님");
+
+    await page.close();
+    await owner.leave();
   });
 });

@@ -44,7 +44,13 @@
 |---|:---:|:---:|---|
 | `/` | ✅ | ✅ | 랜딩. 로비 |
 | `/create` | ✅ | ✅ | |
-| `/room/:id` | ❌ (`robots`로 제외) | ✅ | **카카오톡 링크 공유 미리보기용으로 OG는 필수** |
+| `/room/:id` | ❌ (`robots`로 제외) | ✅ | **카카오톡 링크 공유 미리보기용으로 OG는 필수**. 방 이름을 싣는다 |
+
+- 링크 미리보기 이미지는 `public/og.png`(1200×630). 디자인을 바꿀 때만
+  `node scripts/og-image.mjs`로 다시 만들어 커밋한다 (로컬 Edge로 렌더).
+- 초대 링크는 로비를 거치지 않는다. 방 화면이 참가 **전에** `GET /api/rooms/:id`로
+  방 요약을 받아, 처음 온 사람에게는 닉네임을, 비공개 방이면 비밀번호를 묻는다
+  (`client/ui/JoinGate.svelte`). 방을 만든 직후나 재접속 토큰이 있으면 묻지 않는다.
 
 풀 SSR 메타프레임워크(SvelteKit/Nuxt)는 **쓰지 않는다** — 라우트 3개에 SSR이 필요한 건 메타 태그뿐이다.
 
@@ -83,7 +89,8 @@ liar-game-web/
 │
 ├─ server/                   ★ tsc가 컴파일 → dist/server
 │   ├─ index.ts                Express + Colyseus 부팅
-│   ├─ shell.ts                경로별 OG 메타 주입
+│   ├─ shell.ts                경로별 OG 메타 주입 (초대 링크는 방 이름 포함)
+│   ├─ lobby.ts                방 요약 — GET /api/rooms, /api/rooms/:id
 │   ├─ feedback.ts             POST /api/feedback
 │   └─ rooms/
 │       ├─ LiarRoom.ts         Colyseus Room — 얇은 어댑터
