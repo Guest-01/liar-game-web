@@ -8,6 +8,7 @@ import { ColyseusTestServer, boot } from "@colyseus/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Server } from "colyseus";
 import { LiarRoom } from "./LiarRoom.js";
+import { startMatch } from "../testing/wait.js";
 
 /** 유예를 1초로 줄인 테스트용 방 */
 class FastGraceRoom extends LiarRoom {
@@ -41,9 +42,7 @@ async function inRound(arg: ("normal" | "fool") | number = "normal") {
   const n = typeof arg === "number" ? arg : 4;
   const r = await roomN(n);
   r.room.state.gameMode = mode;
-  r.clients[0]!.send("start-match", {});
-  await r.room.waitForNextPatch();
-  await r.room.waitForNextPatch();
+  await startMatch(r.room, r.clients[0]!);
   return r;
 }
 
@@ -214,8 +213,7 @@ describe("★ 다중 끊김 (체크리스트 G8)", () => {
     // 6명으로 늘려 2명이 빠져도 최소 인원을 유지한다
     const extra = [];
     for (let i = 5; i <= 6; i++) extra.push(await colyseus.connectTo(room, { nickname: `p${i}` }));
-    clients[0]!.send("start-match", {});
-    await room.waitForNextPatch(); await room.waitForNextPatch();
+    await startMatch(room, clients[0]!);
 
     const a = clients[3]!, b = extra[0]!;
     const tokenA = (a as any).reconnectionToken;

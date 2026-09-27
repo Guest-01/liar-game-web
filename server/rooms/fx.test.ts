@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Server } from "colyseus";
 import { LiarRoom } from "./LiarRoom.js";
 import { LIAR_REVEAL_MS, ORDER_REVEAL_MS, VOTE_REVEAL_MS } from "../../shared/constants.js";
+import { startMatch } from "../testing/wait.js";
 
 let colyseus: ColyseusTestServer;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -27,8 +28,7 @@ async function inRound(n = 4) {
   });
   const clients = [];
   for (let i = 1; i <= n; i++) clients.push(await colyseus.connectTo(room, { nickname: `p${i}` }));
-  clients[0]!.send("start-match", {});
-  await room.waitForNextPatch(); await room.waitForNextPatch();
+  await startMatch(room, clients[0]!);
   return { room, clients };
 }
 

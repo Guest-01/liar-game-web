@@ -5,6 +5,7 @@ import { ColyseusTestServer, boot } from "@colyseus/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Server } from "colyseus";
 import { LiarRoom } from "./LiarRoom.js";
+import { startMatch } from "../testing/wait.js";
 
 /** 연출 대기 없이 규칙만 검증하기 위한 테스트용 방 */
 class NoFxRoom extends LiarRoom {
@@ -29,9 +30,7 @@ async function match(totalRounds = 3, n = 4) {
   const clients = [];
   for (let i = 1; i <= n; i++) clients.push(await colyseus.connectTo(room, { nickname: `p${i}` }));
   room.state.totalRounds = totalRounds;
-  clients[0]!.send("start-match", {});
-  await room.waitForNextPatch();
-  await room.waitForNextPatch();
+  await startMatch(room, clients[0]!);
   return { room, clients, host: clients[0]! };
 }
 

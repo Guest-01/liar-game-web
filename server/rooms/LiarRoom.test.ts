@@ -8,6 +8,7 @@ class NoFxRoom extends LiarRoom {
   protected override fxScale = 0;
 }
 import { REDO_TARGET } from "../../shared/constants.js";
+import { startMatch } from "../testing/wait.js";
 
 let colyseus: ColyseusTestServer;
 
@@ -50,8 +51,7 @@ describe("대기실", () => {
 
   it("4명이면 시작된다", async () => {
     const { room, clients, s } = await makeRoom(4);
-    clients[0]!.send("start-match", {});
-    await tick(room);
+    await startMatch(room, clients[0]!);
     expect(s().phase).toBe("word-check");
   });
 
@@ -77,8 +77,7 @@ describe("대기실", () => {
   it("게임 중 입장은 관전자로 처리된다 (M3)", async () => {
     const { room, clients, s } = await makeRoom(4);
     s().maxPlayers = 6;                       // 관전 자리를 만든다
-    clients[0]!.send("start-match", {});
-    await tick(room);
+    await startMatch(room, clients[0]!);
     const late = await colyseus.connectTo(room, { nickname: "늦은사람" });
     await tick(room);
     expect(s().players.get(late.sessionId).isSpectator).toBe(true);
@@ -87,8 +86,7 @@ describe("대기실", () => {
   it("정원이 꽉 차면 게임 중 입장이 거부된다", async () => {
     const { room, clients, s } = await makeRoom(4);
     s().maxPlayers = 4;
-    clients[0]!.send("start-match", {});
-    await tick(room);
+    await startMatch(room, clients[0]!);
     await expect(colyseus.connectTo(room, { nickname: "늦은사람" })).rejects.toThrow();
   });
 });
@@ -97,8 +95,7 @@ describe("라운드 흐름", () => {
   async function started(mode: "normal" | "fool" = "normal") {
     const r = await makeRoom(4);
     (r.room as any).state.gameMode = mode;
-    r.clients[0]!.send("start-match", {});
-    await tick(r.room);
+    await startMatch(r.room, r.clients[0]!);
     return r;
   }
 
@@ -266,8 +263,7 @@ describe("라운드 흐름", () => {
 describe("이탈 처리", () => {
   it("인원이 4명 미만이 되면 라운드가 무효 처리된다", async () => {
     const { room, clients, s } = await makeRoom(4);
-    clients[0]!.send("start-match", {});
-    await tick(room);
+    await startMatch(room, clients[0]!);
     await clients[3]!.leave();
     await tick(room, 3);
     expect(s().phase).toBe("round-result");

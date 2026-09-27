@@ -8,6 +8,7 @@ import { ColyseusTestServer, boot } from "@colyseus/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Server } from "colyseus";
 import { LiarRoom } from "./LiarRoom.js";
+import { startMatch } from "../testing/wait.js";
 
 /** 유예를 1초로 줄인 테스트용 방 */
 class FastGraceRoom extends LiarRoom {
@@ -33,9 +34,7 @@ async function startedRoom() {
   });
   const clients = [];
   for (let i = 1; i <= 4; i++) clients.push(await colyseus.connectTo(room, { nickname: `p${i}` }));
-  clients[0]!.send("start-match", {});
-  await room.waitForNextPatch();
-  await room.waitForNextPatch();
+  await startMatch(room, clients[0]!);
   for (const c of clients) c.send("check-word", {});
   await room.waitForNextPatch();
   await room.waitForNextPatch();

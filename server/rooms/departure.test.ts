@@ -9,6 +9,7 @@ import { ColyseusTestServer, boot } from "@colyseus/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Server } from "colyseus";
 import { LiarRoom } from "./LiarRoom.js";
+import { startMatch, until } from "../testing/wait.js";
 
 class FastRoom extends LiarRoom {
   protected override graceSeconds = 1;
@@ -42,40 +43,50 @@ async function roomN(n: number, name = "liar") {
 }
 async function inRound(n = 5, name = "liar") {
   const r = await roomN(n, name);
-  r.clients[0]!.send("start-match", {});
-  await r.room.waitForNextPatch();
-  await r.room.waitForNextPatch();
+  await startMatch(r.room, r.clients[0]!);
   return r;
 }
 const byId = (room: any, id: string) => room.state.players.get(id);
 
+/**
+ * 나갈 사람을 고른다 — **라이어가 아니어야 한다.** 라이어는 매 라운드 무작위라
+ * 고정 인덱스(clients[4])를 내보내면 약 20%로 라이어가 나가고, 그러면 라이어 이탈
+ * 규칙(D2: 제시어 확인 중이면 라운드 재시작, 피고 확정 뒤면 시민 승)이 먼저 적용돼
+ * 여기서 보려는 "재평가"에 닿지 않는다 (2026-09-27 v2.0.0 태그 CI에서 번갈아 실패).
+ * 라이어 이탈은 아래 "라이어 이탈" 테스트들이 따로 다룬다.
+ */
+const nonLiarLeaver = (room: any, clients: any[], exclude: any[] = []) =>
+  [...clients].reverse().find((c) => c.sessionId !== room.secret.liarId && !exclude.includes(c))!;
+
 describe("이탈 뒤 페이즈 재평가", () => {
   it("★ 제시어 확인: 마지막 미확인자가 나가면 남은 전원 기준으로 진행한다", async () => {
     const { room, clients } = await inRound(5);
-    for (const c of clients.slice(0, 4)) c.send("check-word", {});
-    await wait(200);
+    const leaver = nonLiarLeaver(room, clients);
+    const stay = clients.filter((c) => c !== leaver);
+    for (const c of stay) c.send("check-word", {});
+    await until(() => stay.every((c) => byId(room, c.sessionId).hasCheckedWord), "4명 확인");
     expect(room.state.phase).toBe("word-check");
 
-    await clients[4]!.leave();          // 정상 퇴장 → 즉시 이탈 확정
-    await wait(300);
-    expect(room.state.players.size).toBe(4);
+    await leaver.leave();               // 정상 퇴장 → 즉시 이탈 확정
+    await until(() => room.state.players.size === 4, "이탈 확정");
     expect(room.state.phase).not.toBe("word-check");
     expect(["order-reveal", "description"]).toContain(room.state.phase);
   });
 
   it("최종 투표: 마지막 미투표자가 나가면 개표한다", async () => {
     const { room, clients } = await inRound(5);
-    const defendant = clients[1]!.sessionId;
-    room.state.defendantId = defendant;
+    const defendant = clients[1]!;
+    room.state.defendantId = defendant.sessionId;
     room.enterPhase("final-vote");
-    // 피고(1)와 마지막 사람(4)을 뺀 나머지가 투표한다
-    for (const c of [clients[0], clients[2], clients[3]]) c!.send("final-vote", { agree: true });
-    await wait(200);
+    // 피고와 나갈 사람을 뺀 나머지 셋이 투표한다
+    const leaver = nonLiarLeaver(room, clients, [defendant]);
+    const voters = clients.filter((c) => c !== defendant && c !== leaver);
+    for (const c of voters) c.send("final-vote", { agree: true });
+    await until(() => voters.every((c) => byId(room, c.sessionId).hasFinalVoted), "3명 투표");
     expect(room.state.phase).toBe("final-vote");
 
-    await clients[4]!.leave();
-    await wait(300);
-    expect(room.state.phase).not.toBe("final-vote");
+    await leaver.leave();
+    await until(() => room.state.phase !== "final-vote", "개표");
     expect(room.state.agreeCount).toBe(3);
   });
 
@@ -83,15 +94,17 @@ describe("이탈 뒤 페이즈 재평가", () => {
     const { room, clients } = await inRound(5);
     room.state.descriptionAttempts = 1;
     room.startDiscussion();
-    const target = clients[1]!.sessionId;
-    for (const c of [clients[0], clients[2], clients[3]]) c!.send("nominate", { targetId: target });
-    clients[1]!.send("nominate", { targetId: clients[0]!.sessionId });
-    await wait(200);
+    const leaver = nonLiarLeaver(room, clients);
+    const stay = clients.filter((c) => c !== leaver);
+    // 셋은 stay[1]을, stay[1]은 stay[0]을 지목한다 (자기 자신은 지목할 수 없다)
+    for (const c of stay) c.send("nominate", { targetId: (c === stay[1] ? stay[0] : stay[1]).sessionId });
+    await until(() => stay.every((c) => byId(room, c.sessionId).nominatedId !== ""), "4명 지목");
     const before = room.timer.remainingMs();
     expect(before).toBeGreaterThan(10_000);
 
-    await clients[4]!.leave();
-    await wait(300);
+    await leaver.leave();
+    await until(() => room.state.players.size === 4, "이탈 확정");
+    expect(room.state.phase).toBe("discussion");
     expect(room.timer.remainingMs()).toBeLessThanOrEqual(5_000);
   });
 });
