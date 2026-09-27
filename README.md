@@ -4,10 +4,6 @@
 
 **https://liar-game.guest-01.dev**
 
-> **v2 출시 준비 중** — 구현(M1~M6)은 끝났고 실제 플레이 검증 단계다.
-> 프로덕션은 `v2.0.0` 태그를 밀 때 v2로 교체되며, 그 전까지는
-> v1([`v1.4.1`](https://github.com/Guest-01/liar-game-web/tree/v1.4.1))이 서비스된다.
-
 ---
 
 ## 특징
