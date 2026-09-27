@@ -56,6 +56,8 @@ export type RoomSnapshot = {
   isPaused: boolean;
   graceRemainingMs: number;
   round: number;
+  /** 이번 라운드의 실제 주제 ("" = 라운드 전). 설정값 `category`는 "랜덤"일 수 있다 */
+  roundCategory: string;
   descriptionAttempts: number;
   discussionAttempts: number;
   descriptionOrder: string[];

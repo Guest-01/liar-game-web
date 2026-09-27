@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  RANDOM_CATEGORY, categoryNames, decideAfterDiscussion, decideAfterFinalVote,
+  RANDOM_CATEGORY, SCORE_RULES, canOfferRedo, categoryNames, decideAfterDiscussion, explainRoundDelta, decideAfterFinalVote,
   decideAfterLiarGuess, isGuessCorrect, isValidCategory, makeDescriptionOrder,
   isMatchOver, normalizeWord, pickLiar, pickWords, rank, resolveCategory, scoreRound, tallyFinalVote,
   tallyNominations, wordFor, canStartMatch,
@@ -238,6 +238,21 @@ describe("정답 판정 (체크리스트 A1)", () => {
   });
 });
 
+describe("설명 다시하기 선택지 (2026-09-27 실플레이)", () => {
+  it("첫 토론에는 제시한다", () => {
+    expect(canOfferRedo({ description: 1, discussion: 1 })).toBe(true);
+  });
+  it("설명 기회를 다 썼으면 제시하지 않는다", () => {
+    expect(canOfferRedo({ description: 2, discussion: 1 })).toBe(false);
+  });
+  it("★ 마지막 토론(재토론 소진)이면 설명 기회가 남아도 제시하지 않는다", () => {
+    // 여기서 다시하기가 사람과 동점이 되면 곧바로 라이어 승이었다
+    expect(canOfferRedo({ description: 1, discussion: 2 })).toBe(false);
+    expect(decideAfterDiscussion({ kind: "tie", tiedIds: [REDO_TARGET, "x"] },
+      { description: 1, discussion: 2 }).phase).toBe("round-result");
+  });
+});
+
 describe("정답 후 결말", () => {
   it("정답이면 라이어 역전승", () => {
     expect(decideAfterLiarGuess(true))
@@ -312,6 +327,44 @@ describe("점수 (D4)", () => {
   it("라이어 자신의 지목에는 보너스가 붙지 않는다", () => {
     // 자기 자신 지목은 애초에 막히지만, 규칙 차원에서도 방어한다
     expect(score("liar", nom({ L: "L" })).get("L")).toBe(2);
+  });
+});
+
+describe("점수 내역 설명 (점수판)", () => {
+  const ids = ["L", "c1", "c2", "c3"];
+
+  it("라이어 승리 +2", () => {
+    expect(explainRoundDelta({ delta: 2, isLiar: true, winner: "liar" }))
+      .toEqual([{ label: "라이어 승리", points: 2 }]);
+  });
+  it("시민 승리에 지목 보너스가 더해진다", () => {
+    expect(explainRoundDelta({ delta: 2, isLiar: false, winner: "citizen" }))
+      .toEqual([{ label: "시민 승리", points: 1 }, { label: "라이어 지목", points: 1 }]);
+  });
+  it("라이어가 이겨도 라이어를 지목한 시민은 보너스만 받는다", () => {
+    expect(explainRoundDelta({ delta: 1, isLiar: false, winner: "liar" }))
+      .toEqual([{ label: "라이어 지목", points: 1 }]);
+  });
+  it("증가분이 없으면 설명도 없다 (패배·무효·도중 합류)", () => {
+    expect(explainRoundDelta({ delta: 0, isLiar: false, winner: "citizen" })).toEqual([]);
+    expect(explainRoundDelta({ delta: 0, isLiar: true, winner: "" })).toEqual([]);
+  });
+
+  it("★ 모든 결과에서 내역의 합이 scoreRound의 증가분과 같다", () => {
+    const nominationSets: Array<Record<string, string>> = [{}, { c1: "L" }, { c1: "L", c2: "L", c3: "c1" }];
+    for (const winner of ["citizen", "liar"] as const) {
+      for (const n of nominationSets) {
+        const delta = scoreRound({ winner, liarId: "L", playerIds: ids, nominations: nom(n) });
+        for (const [id, d] of delta) {
+          const items = explainRoundDelta({ delta: d, isLiar: id === "L", winner });
+          expect(items.reduce((sum, i) => sum + i.points, 0), `${winner} ${id}`).toBe(d);
+        }
+      }
+    }
+  });
+
+  it("점수 기준 요약이 상수와 같다", () => {
+    expect(SCORE_RULES.map((r) => r.points)).toEqual([2, 1, 1]);
   });
 });
 

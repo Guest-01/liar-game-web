@@ -108,7 +108,14 @@
       <h1 class="text-lg font-bold truncate flex-1">{s.name}</h1>
       {#if s.round > 0}
         <span class="text-sm text-gray-400 shrink-0 tabular-nums">
-          라운드 {s.round}{s.totalRounds > 0 ? ` / ${s.totalRounds}` : ""}
+          <span class="hidden sm:inline mr-1">라운드</span>{s.round}{s.totalRounds > 0 ? ` / ${s.totalRounds}` : ""}
+        </span>
+      {/if}
+      <!-- 주제는 전원 공개다 (REQUIREMENTS §1.2). 제시어와 달리 가리지 않는다 —
+           특히 라이어는 주제를 계속 보며 거짓말을 준비해야 한다. -->
+      {#if s.roundCategory}
+        <span class="shrink-0 px-2.5 py-1 rounded-lg bg-gray-800 text-sm" title="이번 라운드 주제">
+          <span class="text-gray-400">주제</span> <span class="font-semibold">{s.roundCategory}</span>
         </span>
       {/if}
       <PeekWord />

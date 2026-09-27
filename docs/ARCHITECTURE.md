@@ -346,7 +346,8 @@ type PhaseDef = {
 ```
 discussion 종료
 ├─ 지목 0건 ──────────── attempts.description < 2 ? → description : 라이어 승
-├─ REDO 최다 ─────────── attempts.description < 2 ? → description : (선택지 미제공)
+├─ REDO 최다 ─────────── canOfferRedo(attempts) 일 때만 제시되므로 항상 → description
+│                         (description < 2 && discussion < 2. 마지막 토론에는 선택지 없음)
 ├─ 동점 ───────────────── attempts.discussion  < 2 ? → discussion  : 라이어 승
 └─ 단독 최다 ──────────── → defense
 

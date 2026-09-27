@@ -10,14 +10,14 @@ import {
 } from "../../shared/constants.js";
 import { MESSAGE_SCHEMAS, type MessageType, CreateOptions, JoinOptions } from "../../shared/protocol.js";
 import {
-  canRediscuss, canStartMatch, decideAfterDiscussion, decideAfterFinalVote, decideAfterLiarGuess,
+  canOfferRedo, canRediscuss, canStartMatch, decideAfterDiscussion, decideAfterFinalVote, decideAfterLiarGuess,
   isGuessCorrect, isMatchOver, isValidCategory, makeDescriptionOrder, pickLiar, pickWords,
   resolveCategory, scoreRound, tallyFinalVote, tallyNominations, wordFor,
 } from "../../shared/rules.js";
-import { IN_ROUND_PHASES, type GameMode, type Phase } from "../../shared/types.js";
+import { FX_PHASES, IN_ROUND_PHASES, type GameMode, type Phase } from "../../shared/types.js";
 import { logger } from "../logger.js";
 import { assignSecrets, clearSecrets, syncViews } from "./projection.js";
-import { FX_PHASES, PHASES, phaseAccepts, phaseDuration } from "./phases.js";
+import { PHASES, phaseAccepts, phaseDuration } from "./phases.js";
 import { ChatSchema, PlayerSchema, RoomSchema } from "./state.js";
 import { PhaseTimer } from "./timer.js";
 
@@ -247,10 +247,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
 
   /** 피고(라이어가 아닌)가 이탈했을 때: 기회가 남으면 재토론. */
   private handleDefendantDeparture(): void {
-    const attempts = {
-      description: this.state.descriptionAttempts,
-      discussion: this.state.discussionAttempts,
-    };
+    const attempts = this.attempts();
     if (canRediscuss(attempts)) {
       this.system("피고가 나가 토론을 재개합니다");
       this.startDiscussion();
@@ -437,7 +434,8 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     const words = pickWords(category);
     const liarId = pickLiar(ids);
 
-    this.state.category = category;
+    // 설정값(category)은 건드리지 않는다 — "랜덤"이면 다음 라운드에 다시 뽑는다
+    this.state.roundCategory = category;
     if (advanceRound) this.state.round += 1;
     this.state.descriptionAttempts = 0;
     this.state.discussionAttempts = 0;
@@ -526,9 +524,9 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
 
   private nominate(player: PlayerSchema, targetId: string): void {
     if (targetId === player.id) return;                       // 자기 자신 지목 불가
-    const redoAllowed = this.state.descriptionAttempts < 2;
     if (targetId === REDO_TARGET) {
-      if (!redoAllowed) return;                               // 기회 소진 시 선택지 없음
+      // 설명 기회 소진 또는 마지막 토론이면 선택지 자체가 없다
+      if (!canOfferRedo(this.attempts())) return;
     } else {
       // 지목 대상은 **플레이어**여야 한다. 관전자는 `players` 맵에 같이 있으므로
       // 존재 여부만 보면 통과한다. 관전자가 피고가 되면 변론을 할 수 없다.
@@ -558,10 +556,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   private closeDiscussion(): void {
     // 점수의 "정확 지목 보너스"는 그 라운드의 마지막 지목 기준이다
     this.lastNominations = new Map(this.nominations);
-    const attempts = {
-      description: this.state.descriptionAttempts,
-      discussion: this.state.discussionAttempts,
-    };
+    const attempts = this.attempts();
     const next = decideAfterDiscussion(tallyNominations(this.nominations), attempts);
 
     switch (next.phase) {
@@ -608,10 +603,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   private afterVoteReveal(): void {
     const confirmed = this.state.executionConfirmed;
     const defendantIsLiar = this.state.defendantId === this.secret?.liarId;
-    const attempts = {
-      description: this.state.descriptionAttempts,
-      discussion: this.state.discussionAttempts,
-    };
+    const attempts = this.attempts();
     const next = decideAfterFinalVote(confirmed, defendantIsLiar, attempts);
 
     if (next.phase === "liar-guess") return this.enterPhase("liar-guess");
@@ -718,6 +710,7 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     clearSecrets(this.players());
     this.clearRoundResult();
     this.state.round = 0;
+    this.state.roundCategory = "";
     this.state.descriptionOrder = new ArraySchema<string>();
     this.state.currentDescriberIndex = 0;
     this.state.defendantId = "";
@@ -834,6 +827,11 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
     // 최후 변론 중에는 피고만 발언할 수 있다
     if (this.state.phase === "defense" && this.state.defendantId !== player.id) return;
     this.pushChat(player.id, player.nickname, text);
+    // ★ 채팅도 패치를 만든다. 클라이언트는 패치를 받을 때마다 phaseRemainingMs를
+    //   수신 시각 기준으로 다시 세므로, 여기서 갱신하지 않으면 페이즈 시작 시점의
+    //   남은 시간이 다시 내려가 **타이머가 채팅마다 처음으로 되감긴다.**
+    //   (변론 중 피고가 채팅하면 15초가 계속 다시 시작되어 보였다)
+    this.refresh();
   }
 
   private system(text: string): void {
@@ -852,6 +850,12 @@ export class LiarRoom extends Room<{ state: RoomSchema }> {
   }
 
   // ───────────────────────────────────────────────────────────
+  private attempts(): { description: number; discussion: number } {
+    return {
+      description: this.state.descriptionAttempts,
+      discussion: this.state.discussionAttempts,
+    };
+  }
   private players(): PlayerSchema[] {
     return [...this.state.players.values()].filter((p) => !p.isSpectator);
   }

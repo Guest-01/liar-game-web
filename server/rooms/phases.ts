@@ -84,14 +84,6 @@ export const PHASES: Record<Phase, PhaseDef> = {
   "match-result": { duration: null, accepts: only("next-round") },
 };
 
-/**
- * 연출 페이즈. 게임 규칙이 아니라 보여주기 위한 시간이므로
- * 테스트에서는 길이를 0으로 줄여 즉시 통과시킨다 (LiarRoom.fxScale).
- */
-export const FX_PHASES: ReadonlySet<Phase> = new Set<Phase>([
-  "order-reveal", "description-reveal", "vote-reveal",
-]);
-
 export function phaseAccepts(phase: string, type: MessageType): boolean {
   const def = PHASES[phase as Phase];
   return !!def && (def.accepts as readonly string[]).includes(type);

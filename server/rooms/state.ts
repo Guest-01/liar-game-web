@@ -55,6 +55,12 @@ export class RoomSchema extends Schema {
   // (중복 상태를 두지 않는다).
   @type("uint32")  graceRemainingMs = 0;
   @type("uint8")   round = 0;
+  /**
+   * 이번 라운드의 실제 주제. 전원 공개다 (REQUIREMENTS §1.2).
+   * 설정값 `category`와 따로 둔다 — "랜덤"은 **매 라운드** 새로 뽑아야 하는데
+   * 설정값을 덮어쓰면 2라운드부터 1라운드 주제에 고정된다.
+   */
+  @type("string")  roundCategory = "";
   @type("uint8")   descriptionAttempts = 0;
   @type("uint8")   discussionAttempts = 0;
   @type(["string"]) descriptionOrder = new ArraySchema<string>();

@@ -180,6 +180,92 @@ describe("역할별 UI 게이팅", () => {
   });
 });
 
+describe("실플레이 피드백 (2026-09-27)", () => {
+  it("연출 페이즈에는 타이머와 진행 바를 보이지 않는다", () => {
+    const reveal = snapshot({
+      phase: "description-reveal", phaseEndsAt: 3_500, descriptionOrder: ["a", "b", "c", "d"],
+    });
+    expect(renderWith(Timer, reveal, { remainingMs: 3_000 })).not.toContain("0:03");
+    expect(renderWith(PhaseProgress, reveal, { remainingMs: 3_000 })).not.toContain("progressbar");
+    expect(renderWith(Description, reveal, { remainingMs: 3_000 })).not.toContain("0:03");
+
+    const typing = snapshot({ phase: "description", phaseEndsAt: 30_000, descriptionOrder: ["a", "b", "c", "d"] });
+    expect(renderWith(Description, typing, { remainingMs: 20_000 })).toContain("0:20");
+  });
+
+  it("첫 토론에는 다시하기가 있고 마지막 경고가 없다", () => {
+    const html = renderWith(Discussion, snapshot({
+      phase: "discussion", descriptionOrder: ["a", "b", "c", "d"],
+      descriptionAttempts: 1, discussionAttempts: 1,
+    }));
+    expect(html).toContain("설명 다시하기");
+    expect(html).not.toContain("마지막 토론");
+  });
+
+  it("★ 마지막 토론에는 다시하기를 내놓지 않고 경고한다", () => {
+    const html = renderWith(Discussion, snapshot({
+      phase: "discussion", descriptionOrder: ["a", "b", "c", "d"],
+      descriptionAttempts: 1, discussionAttempts: 2,
+    }));
+    expect(html).not.toContain("설명 다시하기");
+    expect(html).toContain("마지막 토론");
+  });
+
+  it("참가자 목록이 단계별로 누구를 기다리는지 보여준다", () => {
+    const base = snapshot();
+    const with_ = (phase: any, patch: Record<string, object>, over = {}) => snapshot({
+      phase, ...over,
+      players: Object.fromEntries(Object.entries(base.players)
+        .map(([id, p]) => [id, { ...p, ...(patch[id] ?? {}) }])),
+    });
+
+    const check = renderWith(PlayerList, with_("word-check", { a: { hasCheckedWord: true } }));
+    expect(check).toContain("확인 중");
+    expect(check.match(/확인 중/g)).toHaveLength(3);
+
+    const nominate = renderWith(PlayerList, with_("discussion", { a: { nominatedId: "b" } }));
+    expect(nominate).toContain("지목 완료");
+    expect(nominate.match(/고민 중/g)).toHaveLength(3);
+
+    // 피고(d)는 투표하지 않으므로 상태가 없다 → "투표 중"은 b·c 두 명
+    const vote = renderWith(PlayerList, with_("final-vote", { a: { hasFinalVoted: true } }, { defendantId: "d" }));
+    expect(vote).toContain("투표 완료");
+    expect(vote.match(/투표 중/g)).toHaveLength(2);
+
+    expect(renderWith(PlayerList, snapshot({ phase: "waiting" }))).not.toContain("중</");
+  });
+
+  it("제시어 확인·최종 투표 화면이 기다리는 사람의 이름을 보여준다", () => {
+    const base = snapshot();
+    const players = { ...base.players, a: { ...base.players.a!, hasCheckedWord: true, hasFinalVoted: true } };
+    // 플레이어 본인의 대기 문구는 "탭하여 확인"을 누른 뒤에만 보이므로 관전자 시점으로 본다
+    const spectating = renderWith(WordCheck, snapshot({
+      phase: "word-check",
+      players: { ...players, e: player("e", "관전자", { isSpectator: true }) },
+    }), { me: "e" });
+    expect(spectating).toContain("기다리는 중: 보라매, 캐럴, 데이브");
+
+    const vote = renderWith(FinalVote, snapshot({ phase: "final-vote", defendantId: "d", players }));
+    expect(vote).toContain("기다리는 중: 보라매, 캐럴");
+  });
+
+  it("점수판이 증가분의 이유와 점수 기준을 보여준다", () => {
+    const base = snapshot();
+    const html = renderWith(Scoreboard, snapshot({
+      phase: "scoreboard", round: 1, roundWinner: "liar", roundEndReason: "citizen-executed",
+      revealedLiarId: "d",
+      players: {
+        ...base.players,
+        a: { ...base.players.a!, score: 1, roundDelta: 1 },     // 라이어를 지목했던 시민
+        d: { ...base.players.d!, score: 2, roundDelta: 2 },     // 라이어
+      },
+    }));
+    expect(html).toContain("라이어 승리 +2");
+    expect(html).toContain("라이어 지목 +1");
+    expect(html).toContain("점수 기준");
+  });
+});
+
 describe("라우터와 진입 화면", () => {
   it("경로를 정확히 해석한다", async () => {
     const { parse } = await import("./router.svelte.js");

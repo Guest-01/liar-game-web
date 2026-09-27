@@ -221,6 +221,31 @@ describe("라운드 흐름", () => {
     expect(r.s().players.get(c1.sessionId).nominatedId).toBe("");
   });
 
+  it("★ 마지막 토론에서는 설명 기회가 남아도 다시하기 지목이 거부된다", async () => {
+    const r = await toDiscussion(await started());
+    (r.room as any).state.descriptionAttempts = 1;
+    (r.room as any).state.discussionAttempts = 2;      // 재토론 기회 소진
+    const c1 = r.clients[0]!;
+    c1.send("nominate", { targetId: REDO_TARGET });
+    await tick(r.room);
+    expect(r.s().players.get(c1.sessionId).nominatedId).toBe("");
+  });
+
+  it("★ 주제가 \"랜덤\"이면 매 라운드 새로 뽑고 설정값은 그대로 둔다", async () => {
+    const r = await started();
+    expect(r.s().category).toBe("랜덤");
+    expect(r.s().roundCategory).not.toBe("");
+    expect(r.s().roundCategory).not.toBe("랜덤");
+
+    // 설정값을 덮어쓰면 2라운드부터 1라운드 주제에 고정됐다
+    (r.room as any).endRound("citizen", "liar-executed-wrong-guess");
+    await tick(r.room);
+    for (let i = 0; i < 2; i++) { r.clients[0]!.send("next-round", {}); await tick(r.room, 3); }
+    expect(r.s().round).toBe(2);
+    expect(r.s().category).toBe("랜덤");
+    expect(r.s().roundCategory).not.toBe("랜덤");
+  });
+
   it("매치를 마치고 대기실로 돌아가면 비밀이 모두 지워진다", async () => {
     const r = await started();
     (r.room as any).state.totalRounds = 1;      // 1라운드 매치
@@ -263,6 +288,23 @@ describe("채팅", () => {
     clients[3]!.send("chat", { text: "변론합니다" });
     await tick(room);
     expect(s().chat.at(-1).text).toBe("변론합니다");
+  });
+
+  it("★ 채팅이 와도 남은 시간이 페이즈 시작 값으로 되감기지 않는다", async () => {
+    // 클라이언트는 패치마다 phaseRemainingMs를 수신 시각 기준으로 다시 센다.
+    // 채팅이 이 값을 갱신하지 않으면 변론 타이머가 채팅마다 처음부터 다시 시작됐다.
+    const { room, clients, s } = await makeRoom(4);
+    (room as any).state.defendantId = clients[3]!.sessionId;
+    (room as any).enterPhase("defense");
+    await tick(room);
+    const full = s().defenseTime * 1000;
+    expect(s().phaseRemainingMs).toBe(full);
+
+    await new Promise((r) => setTimeout(r, 400));
+    clients[3]!.send("chat", { text: "변론합니다" });
+    await tick(room);
+    expect(s().phase).toBe("defense");
+    expect(s().phaseRemainingMs).toBeLessThanOrEqual(full - 300);
   });
 
   it("빈 채팅은 거부된다 (zod 검증)", async () => {

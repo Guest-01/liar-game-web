@@ -7,6 +7,11 @@
   const amDefendant = $derived(s.defendantId === game.mySessionId);
   const votedCount = $derived(playerList().filter((p) => p.hasFinalVoted).length);
   const eligible = $derived(playerList().length - 1);
+  const pendingNames = $derived(
+    playerList()
+      .filter((p) => p.id !== s.defendantId && !p.hasFinalVoted)
+      .map((p) => p.nickname).join(", "),
+  );
 </script>
 
 <div class="text-center py-8 space-y-6">
@@ -32,5 +37,8 @@
     </div>
   {/if}
 
-  <p class="text-sm text-gray-500">{votedCount} / {eligible}명 투표함</p>
+  <p class="text-sm text-gray-500">
+    {votedCount} / {eligible}명 투표함
+    {#if pendingNames}<span class="block mt-0.5">기다리는 중: {pendingNames}</span>{/if}
+  </p>
 </div>

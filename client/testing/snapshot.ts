@@ -22,7 +22,7 @@ export function snapshot(over: Partial<RoomSnapshot> = {}): RoomSnapshot {
     descriptionTime: 30, discussionTime: 120, defenseTime: 15,
     phase: "waiting", phaseRemainingMs: 0, phaseEndsAt: 0,
     isPaused: false, graceRemainingMs: 0,
-    round: 0, descriptionAttempts: 0, discussionAttempts: 0,
+    round: 0, roundCategory: "", descriptionAttempts: 0, discussionAttempts: 0,
     descriptionOrder: [], currentDescriberIndex: 0, defendantId: "",
     agreeCount: 0, disagreeCount: 0, abstainCount: 0,
     executionConfirmed: false, defendantWasLiar: false,

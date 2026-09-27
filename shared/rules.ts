@@ -145,6 +145,18 @@ export function canRediscuss(a: Attempts): boolean {
 }
 
 /**
+ * 토론에서 "설명 다시하기"를 선택지로 **제시하는가**. 서버 검증과 화면이 같이 쓴다.
+ *
+ * 설명 기회만 남아 있으면 되는 게 아니다. **마지막 토론**(재토론 기회 소진)에서
+ * 다시하기가 사람과 동점이 되면 곧바로 라이어 승이 되고, 가결돼도 이어지는 토론에는
+ * 재토론 기회가 없다. 시민에게 손해만 되는 선택지이므로 내놓지 않는다.
+ * (무투표로 끝나면 설명 기회가 남은 한 여전히 설명부터 다시 한다 — decideAfterDiscussion)
+ */
+export function canOfferRedo(a: Attempts): boolean {
+  return canRedescribe(a) && canRediscuss(a);
+}
+
+/**
  * 토론(지목) 종료 시 다음 단계를 결정한다.
  *
  * 단일 원칙: **시민에게 주어진 기회는 유한하다. 소진하고도 라이어를 처형하지 못하면 라이어 승.**
@@ -293,6 +305,40 @@ export function scoreRound(input: RoundScoreInput): Map<string, number> {
   }
   return delta;
 }
+
+export type ScoreItem = { label: string; points: number };
+
+/**
+ * 점수판에 보일 "왜 +N인가". scoreRound의 역산이다.
+ *
+ * 증가분·역할·승자만으로 결정된다 — 승리 몫은 역할과 승자로 정해지고, 나머지가
+ * 정확 지목 보너스다. 서버가 따로 내역을 보내지 않아도 되고, 라운드 결과 화면에서
+ * 이미 공개된 정보(라이어 정체·승자)만 쓴다.
+ *
+ * 증가분이 0이면(패배, 무효, 도중 합류) 빈 배열이다.
+ */
+export function explainRoundDelta(input: {
+  delta: number;
+  isLiar: boolean;
+  winner: RoundWinner | "";
+}): ScoreItem[] {
+  if (input.delta <= 0) return [];
+  if (input.isLiar) return [{ label: "라이어 승리", points: input.delta }];
+
+  const items: ScoreItem[] = [];
+  const win = input.winner === "citizen" ? Math.min(SCORE_CITIZEN_WIN, input.delta) : 0;
+  if (win > 0) items.push({ label: "시민 승리", points: win });
+  const bonus = input.delta - win;
+  if (bonus > 0) items.push({ label: "라이어 지목", points: bonus });
+  return items;
+}
+
+/** 점수판 하단에 보일 점수 규칙 요약. 상수와 어긋나지 않도록 여기서 만든다. */
+export const SCORE_RULES: readonly ScoreItem[] = [
+  { label: "라이어 승리 시 라이어", points: SCORE_LIAR_WIN },
+  { label: "시민 승리 시 시민 전원", points: SCORE_CITIZEN_WIN },
+  { label: "라이어를 지목한 시민 (승패 무관)", points: SCORE_CORRECT_NOMINATION },
+];
 
 /** 매치가 끝났는가. totalRounds가 0이면 무제한이다. */
 export function isMatchOver(round: number, totalRounds: number): boolean {

@@ -6,11 +6,34 @@
   import WifiOff from "@lucide/svelte/icons/wifi-off";
   import Check from "@lucide/svelte/icons/check";
   import UserX from "@lucide/svelte/icons/user-x";
+  import Hourglass from "@lucide/svelte/icons/hourglass";
+  import type { PlayerSnapshot } from "../../shared/snapshot.js";
 
   const inRound = $derived(game.snapshot?.phase !== "waiting");
   // 라운드 중에는 관전자만 강퇴할 수 있다 (서버도 같은 규칙을 강제한다)
   const canKickPlayer = $derived(isHost() && !inRound);
   const canKickSpectator = $derived(isHost());
+
+  /**
+   * "전원 완료"를 기다리는 단계에서 누가 끝냈고 누구를 기다리는지.
+   * 인원수만 보여주면 누가 멈춰 있는지 알 수 없다. 전부 이미 공개된 필드다
+   * (확인 여부·지목 여부·투표 여부 — 지목 대상과 찬반은 여기서 드러나지 않는다).
+   */
+  type Status = { done: boolean; label: string } | null;
+  function statusOf(p: PlayerSnapshot): Status {
+    const s = game.snapshot;
+    switch (s?.phase) {
+      case "word-check":
+        return p.hasCheckedWord ? { done: true, label: "확인" } : { done: false, label: "확인 중" };
+      case "discussion":
+        return p.nominatedId ? { done: true, label: "지목 완료" } : { done: false, label: "고민 중" };
+      case "final-vote":
+        if (p.id === s.defendantId) return null;             // 피고는 투표하지 않는다
+        return p.hasFinalVoted ? { done: true, label: "투표 완료" } : { done: false, label: "투표 중" };
+      default:
+        return null;
+    }
+  }
 </script>
 
 <div class="bg-gray-800 rounded-xl p-4">
@@ -20,6 +43,7 @@
   </h3>
   <ul class="space-y-2">
     {#each playerList() as p (p.id)}
+      {@const status = statusOf(p)}
       <li class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700/50"
           class:opacity-50={!p.isConnected}>
         <span class="flex-1 truncate inline-flex items-center gap-1.5">
@@ -29,8 +53,10 @@
         </span>
         {#if !p.isConnected}
           <span class="text-xs text-warning inline-flex items-center gap-1"><WifiOff class="w-3.5 h-3.5" />접속 끊김</span>
-        {:else if game.snapshot?.phase === "word-check" && p.hasCheckedWord}
-          <span class="text-xs text-success inline-flex items-center gap-1"><Check class="w-3.5 h-3.5" />확인</span>
+        {:else if status?.done}
+          <span class="text-xs text-success inline-flex items-center gap-1"><Check class="w-3.5 h-3.5" />{status.label}</span>
+        {:else if status}
+          <span class="text-xs text-gray-400 inline-flex items-center gap-1"><Hourglass class="w-3.5 h-3.5" />{status.label}</span>
         {/if}
         {#if canKickPlayer && p.id !== game.mySessionId}
           <button onclick={() => send("kick", { targetId: p.id })} title="강퇴"

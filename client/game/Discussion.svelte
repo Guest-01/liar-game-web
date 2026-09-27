@@ -10,13 +10,18 @@
    */
   import { amSpectator, game, me, playerList, send } from "../lib/connection.svelte.js";
   import { REDO_TARGET } from "../../shared/constants.js";
+  import { canOfferRedo, canRediscuss } from "../../shared/rules.js";
   import Timer from "./Timer.svelte";
   import Check from "@lucide/svelte/icons/check";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
+  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
 
   const s = $derived(game.snapshot!);
   const my = $derived(me());
-  const canRedo = $derived(s.descriptionAttempts < 2);
+  const attempts = $derived({ description: s.descriptionAttempts, discussion: s.discussionAttempts });
+  const canRedo = $derived(canOfferRedo(attempts));
+  // 재토론 기회가 없다 — 동점이거나 최종 투표에서 과반을 못 얻으면 라이어가 이긴다
+  const lastChance = $derived(!canRediscuss(attempts));
   const canNominate = $derived(!amSpectator());
 
   /** 발언 순서대로. 순서 배열에 없는 사람(있을 수 없지만)도 뒤에 붙인다. */
@@ -29,6 +34,7 @@
     return [...inOrder, ...rest];
   });
   const voterCount = $derived(playerList().length);
+  const nominatedCount = $derived(playerList().filter((p) => p.nominatedId !== "").length);
   const countFor = (id: string) => playerList().filter((p) => p.nominatedId === id).length;
 
   // 득표가 늘어난 대상에 짧게 펄스를 준다 (REQUIREMENTS §F9)
@@ -56,14 +62,25 @@
     <Timer />
   </div>
 
+  {#if lastChance}
+    <div class="flex items-start gap-2 px-4 py-3 rounded-xl bg-danger/15 border border-danger/40 text-sm">
+      <TriangleAlert class="w-4 h-4 text-danger shrink-0 mt-0.5" />
+      <p>
+        <span class="font-semibold">마지막 토론입니다.</span>
+        지목이 동점이거나 최종 투표에서 과반을 얻지 못하면 라이어가 승리합니다.
+      </p>
+    </div>
+  {/if}
+
   <div>
     <div class="flex items-baseline justify-between mb-2">
       <h3 class="font-semibold">
         {amSpectator() ? "지목 현황" : "누가 라이어일까요?"}
       </h3>
-      {#if canNominate}
-        <span class="text-xs text-gray-500">설명을 읽고 줄을 눌러 지목하세요</span>
-      {/if}
+      <!-- 전원이 지목하면 토론이 곧 끝난다 — 몇 명이 남았는지가 진행 신호다 -->
+      <span class="text-xs text-gray-500 tabular-nums">
+        {#if canNominate}설명을 읽고 줄을 눌러 지목하세요 · {/if}{nominatedCount}/{voterCount}명 지목
+      </span>
     </div>
 
     <ul class="space-y-2">
@@ -136,7 +153,7 @@
 
     {#if amSpectator()}
       <p class="text-xs text-gray-500 mt-2">관전 중에는 지목할 수 없습니다</p>
-    {:else if !canRedo}
+    {:else if !canRedo && !lastChance}
       <p class="text-xs text-gray-500 mt-2">설명 다시하기 기회를 모두 사용했습니다</p>
     {/if}
   </div>
