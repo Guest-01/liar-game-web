@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,22 @@ const IS_PROD = process.env.NODE_ENV === "production";
 const here = dirname(fileURLToPath(import.meta.url));
 // dist/server/index.js 기준으로 dist/public을 가리킨다
 const PUBLIC_DIR = join(here, "..", "public");
+
+/**
+ * 시작 로그에 찍을 버전. 운영에서 "지금 무엇이 떠 있는가"를 로그 한 줄로 확인한다 (v1과 같다).
+ * 개발(server/index.ts)과 빌드(dist/server/index.js)의 깊이가 달라 두 곳을 본다.
+ * 이미지에는 package.json이 /app에 복사되어 있다 (Dockerfile).
+ */
+function readVersion(): string {
+  for (const p of [join(here, "..", "package.json"), join(here, "..", "..", "package.json")]) {
+    try {
+      const pkg = JSON.parse(readFileSync(p, "utf-8")) as { name?: string; version?: string };
+      if (pkg.name === "liar-game-web" && pkg.version) return pkg.version;
+    } catch { /* 다음 후보 */ }
+  }
+  return "unknown";
+}
+const VERSION = readVersion();
 
 const app = express();
 app.set("trust proxy", 1);
@@ -91,7 +108,7 @@ await gameServer.listen(PORT);
   }
   throw err;
 }
-logger.info({ port: PORT, prod: IS_PROD }, `🎮 라이어 게임 v2 서버 http://localhost:${PORT}`);
+logger.info({ port: PORT, prod: IS_PROD }, `🎮 라이어 게임 v${VERSION} 서버 http://localhost:${PORT}`);
 
 const shutdown = async () => {
   logger.info("🛑 서버를 종료합니다");

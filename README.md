@@ -105,10 +105,13 @@ npm run build
 NODE_ENV=production node dist/server/index.js
 ```
 
+시작 로그 첫 줄에 버전이 찍힌다 (`🎮 라이어 게임 v2.0.0 서버 …`). 태그를 밀기 전에
+`package.json`의 `version`을 태그와 맞춘다.
+
 | 환경 변수 | 기본값 | |
 |---|---|---|
-| `PORT` | `2567` | |
-| `NODE_ENV` | — | `production`이면 빌드된 클라이언트를 서빙하고 JSON 로그를 쓴다 |
+| `PORT` | `2567` (Docker 이미지는 `3000`) | 이미지는 v1과 같은 포트라 기존 리버스 프록시 설정 그대로 붙는다 |
+| `NODE_ENV` | — (Docker 이미지는 `production`) | `production`이면 빌드된 클라이언트를 서빙하고, 로그를 v1과 같은 한 줄 형식으로 남긴다 |
 | `BASE_URL` | `https://liar-game.guest-01.dev` | OG 태그·sitemap의 절대 URL |
 | `LOG_LEVEL` | `info` (개발 `debug`) | |
 | `DISCORD_WEBHOOK_URL` | — | 설정하면 인앱 피드백이 켜진다. 클라이언트에 노출되지 않는다 |

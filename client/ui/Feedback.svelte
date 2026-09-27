@@ -8,7 +8,9 @@
 
   let { roomId = "" }: { roomId?: string } = $props();
 
-  const HIDE_KEY = "feedbackHiddenUntil";
+  // v1과 같은 키·같은 의미(숨김 만료 시각, ms). v1에서 숨겨 둔 사람에게 v2 교체 직후
+  // 카드가 다시 튀어나오지 않게 한다.
+  const HIDE_KEY = "feedbackDismissedUntil";
   const WEEK = 7 * 24 * 60 * 60 * 1000;
 
   let available = $state(false);
