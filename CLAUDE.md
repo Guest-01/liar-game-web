@@ -13,7 +13,7 @@
   이 브랜치 작업이나 main 병합으로는 프로덕션이 바뀌지 않는다.
 
 ```
-npm install
+npm ci             # 설치는 install이 아니라 ci (아래 참조)
 npm run dev        # 빈 포트를 찾아 서버+Vite를 함께 띄운다 (기본 2567)
 npm test           # 193개 전체 (약 2분)
 npm run test:client  #  33개, 8초 — UI를 만지는 중이라면 이것만
@@ -24,6 +24,15 @@ npm run build      # dist/{server,shared,public}
 
 테스트 중 서버 로그는 기본으로 꺼진다(`vitest.config.ts`). 실패를 파고들 때만
 `LOG_LEVEL=debug npm test` 로 되살린다.
+
+**Node는 22** (CI·Dockerfile과 같다. `.nvmrc`). 다른 메이저로도 돌아가지만
+버전 차이가 의심되는 문제는 22에서 먼저 재현한다 (체크리스트 E1).
+
+**Windows에서 `npm install <패키지>`는 lockfile을 깨뜨린다.** 리눅스 전용 선택
+의존성 항목이 지워져 CI의 `npm ci`가 "not in sync"로 실패한다(2026-09-06 실제 발생).
+그냥 설치할 때는 `npm ci`를 쓰고, 의존성을 추가·갱신할 때는
+`docs/REGRESSION-CHECKLIST.md` G4의 대처법을 따른다. 커밋 전 `npm ci --dry-run`이
+in sync인지 확인한다.
 
 ## 먼저 읽을 것
 
@@ -122,10 +131,12 @@ v1에서 가져온 것. 코드가 아니라 **콘텐츠**이므로 함부로 줄
 
 ## ⚠️ 로컬에서 서버를 띄울 때
 
-이 환경에는 **dotenvx가 node 프로세스에 `.env`를 자동 주입**한다.
-프로젝트 디렉터리에서 서버를 띄우면 `--env-file` 없이도 **실제
-`DISCORD_WEBHOOK_URL`이 들어간다.** 즉 `/api/feedback` 을 찔러보면
-운영자의 실제 Discord 채널로 메시지가 나간다.
+**프로젝트 루트에 실제 웹훅이 담긴 `.env`가 있는 환경**에서는
+`npm run dev`(`--env-file-if-exists=.env`)가 그 값을 읽고, dotenvx를 쓰는
+환경이라면 `--env-file` 없이 띄운 node 프로세스에도 `.env`가 자동 주입된다.
+그러면 **실제 `DISCORD_WEBHOOK_URL`이 들어가서** `/api/feedback` 을 찔러보면
+운영자의 실제 Discord 채널로 메시지가 나간다. `.env`가 없는 환경이라면 해당
+없다 — 서버 시작 로그에 "피드백 비활성"이 찍히는지로 확인한다.
 
 수동으로 피드백을 시험할 때는 웹훅을 비워라:
 
@@ -137,12 +148,13 @@ DISCORD_WEBHOOK_URL= NODE_ENV=production node dist/server/index.js
 
 ## 테스트 구성
 
-**자동화(`npm test`·CI)는 브라우저를 쓰지 않는다.** 전부 3초 안에 돈다.
+**자동화(`npm test`·CI)는 브라우저를 쓰지 않는다.** 클라이언트 쪽은 10초 안에
+끝나고, 시간의 대부분은 실제 방을 수백 개 만드는 서버 룸 테스트다.
 
 | 파일 | 잡는 것 | 시간 |
 |---|---|---|
 | `shared/rules.test.ts` | 게임 규칙 (프레임워크 무관 순수 함수) | — |
-| `server/rooms/*.test.ts` | 룸 통합 · **정보 은닉 바이트 검증(배포 게이트)** | 90초 |
+| `server/rooms/*.test.ts` | 룸 통합 · **정보 은닉 바이트 검증(배포 게이트)** | 약 2분 |
 | `client/smoke.test.ts` | 모든 화면 렌더 + **화면에 새는 정보** | 2.1초 |
 | `client/integration.test.ts` | **실 Colyseus 서버 + 실 WebSocket + Svelte 반응성** · 소켓 끊김→SDK 자동 재접속→복귀 | 6초 |
 | `client/conventions.test.ts` | 룬 파일 규약 (G12) | — |
@@ -197,5 +209,8 @@ npm run bots -- --help
 
 - **실제 플레이 검증** — `npm run bots -- --room <ID>` 로 봇 3명을 붙이고 창 하나로
   플레이한다. 연출 타이밍이 손에 맞는지는 눈으로만 안다 (봇으로도 대신할 수 없다)
-- `docs/REGRESSION-CHECKLIST.md` 남은 항목 확인
+- `docs/REGRESSION-CHECKLIST.md` 남은 항목 — B3(페이지 전환 반복 시 서버 연결 수 불변)을
+  브라우저로 확인, H4의 모바일 Safari 백그라운드 복귀 실기기 확인.
+  C4(출처 제한)는 2026-09-27에 보류로 결정했다
+- `README.md`가 아직 "구현 코드가 없는 백지 상태"라고 말한다 — main 병합 전에 고칠 것
 - `v2.0.0` 태그를 밀면 그때 프로덕션이 교체된다. **그 전까지는 태그를 만들지 말 것**
