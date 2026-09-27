@@ -88,6 +88,9 @@ if (IS_PROD) {
 const httpServer = createServer(app);
 const gameServer = new Server({
   transport: new WebSocketTransport({ server: httpServer }),
+  // 종료 신호는 아래 shutdown() 하나만 받는다. Colyseus 기본값(true)은 자체 처리기를
+  // 따로 걸어 종료가 두 번 시도되고 "error during shutdown: already_shutting_down"을 남긴다.
+  gracefullyShutdown: false,
 });
 gameServer.define("liar", LiarRoom);
 
