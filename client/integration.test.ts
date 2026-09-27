@@ -5,7 +5,7 @@
  * 진짜 WebSocket 위에서 동작하는지 본다. Node 22에 전역 WebSocket이 있어
  * SDK가 그대로 붙는다.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { flushSync, mount, unmount } from "svelte";
 import { createServer } from "node:http";
 import { Server } from "colyseus";
@@ -122,6 +122,9 @@ describe("실 서버 + Svelte 반응성", () => {
       .create("liar", { nickname: "주인", roomName: "루프방", isPublic: true });
 
     localStorage.setItem("nickname", "루프");
+    // 대기실(Waiting.svelte)이 /api/categories 를 부른다. 이 테스트에는 HTTP 서버가
+    // 없어서 happy-dom 기본 주소(localhost:3000)로 나가 ECONNREFUSED 로그를 남긴다.
+    vi.stubGlobal("fetch", async () => Response.json({ categories: [] }));
     const host = document.createElement("div");
     document.body.appendChild(host);
     const app = mount(Room, { target: host, props: { roomId: owner.roomId } });
@@ -137,6 +140,7 @@ describe("실 서버 + Svelte 반응성", () => {
 
     unmount(app);
     host.remove();
+    vi.unstubAllGlobals();
     await owner.leave();
   });
 });
