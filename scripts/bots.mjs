@@ -187,7 +187,10 @@ async function spawn(name, roomId) {
         isPublic: !opts.password, password: opts.password,
       });
 
-  const bot = { name, room, client, done: new Set(), left: false };
+  const bot = {
+    name, room, client, done: new Set(), left: false,
+    epoch: 0, lastPhase: "", lastChecked: false,
+  };
   bots.push(bot);
 
   const say = (msg) => { if (!opts.quiet) console.log(`  ${name}: ${msg}`); };
@@ -221,7 +224,16 @@ async function spawn(name, roomId) {
     // 관전자는 아무것도 하지 않는다. 서버가 어차피 거부한다
     if (me.isSpectator) return;
 
-    const r = s.round;
+    // 행동 키의 라운드 구분자. **라운드 번호(s.round)를 쓰면 안 된다** — 무효 라운드는
+    // 같은 번호로 다시 진행되므로 키가 겹쳐 봇이 "이미 했다"며 멈춘다. 제시어 확인에
+    // 새로 들어올 때(또는 라이어 이탈로 확인 단계가 그 자리에서 재시작될 때) 올린다.
+    if (s.phase === "word-check" &&
+        (bot.lastPhase !== "word-check" || (bot.lastChecked && !me.hasCheckedWord))) {
+      bot.epoch++;
+    }
+    bot.lastPhase = s.phase;
+    bot.lastChecked = me.hasCheckedWord;
+    const r = bot.epoch;
     const others = Object.values(s.players)
       .filter((p) => !p.isSpectator && p.id !== room.sessionId);
 
@@ -230,7 +242,7 @@ async function spawn(name, roomId) {
         if (!opts.autoStart || !me.isHost) return;
         const n = Object.values(s.players).filter((p) => !p.isSpectator).length;
         if (n < MIN_PLAYERS) return;
-        act(`start:${n}`, opts.delay, "게임 시작", () => room.send("start-match", {}));
+        act(`start:${r}:${n}`, opts.delay, "게임 시작", () => room.send("start-match", {}));
         return;
       }
 
