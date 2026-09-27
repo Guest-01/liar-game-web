@@ -10,7 +10,7 @@ on:
 # 브라우저 없이 도는 계층이 실제 위험을 이미 덮는다:
 #
 #   client/smoke.test.ts       화면 렌더 + 새면 안 될 정보 (2초)
-#   client/integration.test.ts 실제 Colyseus 서버 + 실 WebSocket + 반응성 (3.6초)
+#   client/integration.test.ts 실제 Colyseus 서버 + 실 WebSocket + 반응성 (약 8초)
 #
 # Playwright가 유일하게 더 잡는 것은 CSS로 요소가 안 보이거나 클릭이 막히는
 # 부류인데, 브라우저 설치 ~170MB와 실행 1~2분을 매 푸시마다 지불할 값어치가

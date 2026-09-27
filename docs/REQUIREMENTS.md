@@ -234,6 +234,8 @@
 
 ### F2. 로비
 - 방 목록이 **실시간으로 갱신**된다 (생성·인원 변동·상태 변경이 즉시 반영).
+  - v2 현황: 로비가 `/api/rooms`를 **3초마다 조회**한다 (`Lobby.svelte`). v1의 소켓 푸시
+    대신 택한 단순화로, 체감상 충분하다고 보고 유지 중이다.
 - 노출 조건과 표시:
 
   | 방 상태 | 노출 | 표시 |
@@ -445,9 +447,13 @@ v1에서 실제 플레이로 조정된 값들. 근거 없이 바꾸지 말 것.
   `timer-warning`, `pulse-border`, `animate-glitch`, `fade-in`
 - 테마 색상 (primary / secondary / success / warning / danger)
 - 서체: Pretendard (본문) + JetBrains Mono (타이머)
+  - v2 현황: 타이머도 Pretendard의 `tabular-nums`를 쓴다. JetBrains Mono는 v1에서도
+    로드된 적이 없었다 (체크리스트 D9).
 
 ### 운영 계약
 - 환경변수: `PORT`, `BASE_URL`, `ALLOWED_ORIGINS`, `LOG_LEVEL`, `NODE_ENV`, `DISCORD_WEBHOOK_URL`
+  - v2 현황: `ALLOWED_ORIGINS`(출처 제한)는 구현하지 않았다 — 같은 오리진 서빙이라 보류
+    (체크리스트 C4, 2026-09-27). 나머지 다섯 개만 읽는다.
 - Dockerfile 멀티스테이지 구조
 - CI 워크플로 2종 — 테스트(`push`/`PR`), 이미지 배포(**`v*` 태그 푸시에만** 트리거)
 - `sitemap.xml`, `robots.txt`, OG 태그

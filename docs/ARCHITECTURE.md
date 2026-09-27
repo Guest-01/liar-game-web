@@ -97,20 +97,27 @@ liar-game-web/
 │       ├─ state.ts            Schema 정의 (공개 / @view 분리)
 │       ├─ phases.ts           상태 머신 전이 테이블
 │       ├─ projection.ts       StateView 관리 — 정보 은닉 단일 지점
-│       ├─ timer.ts            페이즈 타이머 + 일시정지
-│       └─ LobbyRoom.ts        로비 실시간 방 목록
+│       └─ timer.ts            페이즈 타이머 + 일시정지
 │
 ├─ client/                   ★ vite가 번들 → dist/public
-│   ├─ main.ts  router.ts
+│   ├─ main.ts  router.svelte.ts  App.svelte
 │   ├─ app.css                 테마 색 + 키프레임      ← v1 이식
 │   ├─ lib/     connection.svelte.ts  session.ts
 │   ├─ routes/  Lobby.svelte  Create.svelte  Room.svelte
-│   ├─ game/    페이즈별 화면 컴포넌트
-│   ├─ fx/      연출 (타이핑·셔플·라이어공개·펄스)
-│   └─ ui/      공용 (토스트·모달·채팅시트)
+│   ├─ game/    페이즈별 화면 컴포넌트 + 헤더·참가자 목록·채팅
+│   ├─ fx/      연출 (순서 추첨·타이핑)
+│   ├─ ui/      공용 (토스트·피드백·초대 링크 입장 화면)
+│   └─ testing/ 스모크 테스트용 렌더러·합성 스냅샷
+│
+├─ scripts/
+│   ├─ dev.mjs                 빈 포트를 정해 서버 + Vite를 함께 띄운다
+│   ├─ bots.mjs                봇 하니스 (실플레이 검증·불변식 감시)
+│   └─ og-image.mjs            링크 미리보기 카드(public/og.png) 생성
 │
 ├─ public/                   Vite publicDir → 그대로 복사
-│   └─ favicon.svg  favicon.png  robots.txt  sitemap.xml   ← v1 이식
+│   ├─ favicon.svg  favicon.png  robots.txt  sitemap.xml   ← v1 이식
+│   └─ og.png                  링크 미리보기 카드 1200×630
+├─ e2e/                      Playwright 스모크 (수동 전용)
 ├─ index.html                SPA 셸 (서버가 메타 주입해 반환)
 │
 ├─ package.json              ★ 하나
@@ -261,29 +268,37 @@ class LiarRoom extends Room<{ state: RoomSchema }> {   // ← 0.17 제네릭 형
 class RoomSchema extends Schema {
   // 설정 (대기실에서 호스트가 변경)
   @type("string") name; @type("boolean") isPublic;
-  @type("uint8")  maxPlayers; @type("string") gameMode; @type("string") category;
+  @type("uint8")  maxPlayers; @type("string") gameMode;
+  @type("string") category;                 // 설정값. "랜덤"일 수 있다
   @type("uint8")  totalRounds;              // 0 = 무제한
   @type("uint16") descriptionTime, discussionTime, defenseTime;
 
   // 진행
   @type("string")  phase;                   // §4
   @type("uint32")  phaseRemainingMs;        // ← 절대시각 금지 (체크리스트 D6)
+  @type("number")  phaseEndsAt;             // 이 페이즈의 전체 길이(ms). 0 = 무기한
   @type("boolean") isPaused;
   @type("uint32")  graceRemainingMs;        // 누가 끊겼는지는 Player.isConnected로 파생
   @type("uint8")   round;
+  @type("string")  roundCategory;           // 이번 라운드 실제 주제 — 설정값을 덮어쓰지 않는다 (A7)
   @type("uint8")   descriptionAttempts, discussionAttempts;   // 기회 상한 (최대 2)
   @type(["string"]) descriptionOrder;
   @type("uint8")   currentDescriberIndex;
   @type("string")  defendantId;
   @type("uint8")   agreeCount, disagreeCount, abstainCount;   // 개표 페이즈에만
+  @type("boolean") executionConfirmed, defendantWasLiar;      // 처형 확정 시에만 의미
   @type({ map: PlayerSchema }) players;
   @type([ChatMessage]) chat;                // 최근 50개
 
   // 라운드 결과 공개용 (result 페이즈 진입 시에만 채움)
   @type("string") revealedLiarId, revealedCitizenWord, revealedLiarWord;
-  @type("string") liarGuess, roundWinner;
+  @type("string") liarGuess, roundWinner, roundEndReason;
 }
 ```
+
+**`phaseRemainingMs`는 상태를 바꾸는 모든 경로가 `refresh()`로 갱신한다.** 클라이언트는
+패치를 받을 때마다 이 값을 수신 시각 기준으로 다시 세므로, 갱신을 빠뜨린 경로(예전의
+채팅)가 있으면 타이머가 페이즈 시작 값으로 되감긴다 (체크리스트 D10).
 
 **채팅을 state에 두는 이유**: 재접속·관전 진입 시 자동 복구된다.
 전원 공개 정보라 정보 은닉과 무관하고, 50개면 페이로드도 작다.

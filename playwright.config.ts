@@ -5,13 +5,12 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * `npm test` 에 포함되지 않으며, 필요할 때만 손으로 돌린다:
  *
- *      npm run test:e2e:install     # 최초 1회 (브라우저 내려받기)
- *      npm run test:e2e
+ *      npm run test:e2e             # 빌드 포함. 브라우저는 내려받지 않는다 (아래 channel)
  *
  * 왜 CI에서 뺐나: 브라우저 없이 도는 계층이 위험의 대부분을 이미 덮는다.
  *
- *   client/smoke.test.ts        화면 렌더 + 새면 안 될 정보          2.1초
- *   client/integration.test.ts  실 Colyseus 서버 + 실 WebSocket      3.6초
+ *   client/smoke.test.ts        화면 렌더 + 새면 안 될 정보          약 2초
+ *   client/integration.test.ts  실 Colyseus 서버 + 실 WebSocket      약 8초
  *
  * 그럼 이쪽만 잡는 것은 무엇인가. **라우팅 전환**이다. 화면이 갈릴 때 도는
  * $effect와 그 정리(cleanup)는 브라우저에서만 실행된다. 컴포넌트를 하나씩
